@@ -22,3 +22,7 @@ class CommandRejected(HTTPException):
 
     def __str__(self):
         return f"status={self.status}, message={self.body}"
+
+
+class InvalidCommandOptionType(RoidException):
+    """ The given option has being hinted as being a invalid type. """

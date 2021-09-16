@@ -8,14 +8,15 @@ from nacl.signing import VerifyKey
 from nacl.exceptions import BadSignatureError
 
 from typing import Dict, List
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Body
 from fastapi.exceptions import HTTPException
 
 from roid.command import CommandType, Command, CommandOption
 from roid import exceptions
-from roid.interactions import InteractionType
+from roid.interactions import InteractionType, Interaction
+from roid.config import MAIN_DOMAIN
 
-COMMANDS_ADD = "https://discord.com/api/v8/applications/{application_id}/commands"
+COMMANDS_ADD = f"{MAIN_DOMAIN}/api/v8/applications/{{application_id}}/commands"
 
 
 logger = logging.getLogger("roid-main")
@@ -58,14 +59,17 @@ class SlashCommands(FastAPI):
 
         data = orjson.loads(body)
 
-        message_type = data['type']
-        if message_type == InteractionType.PING:
+        interaction = Interaction(**data)
+        if interaction.type == InteractionType.PING:
             return {
                 "type": 1
             }
-        elif message_type == InteractionType.APPLICATION_COMMAND:
-            ...
-        elif message_type == InteractionType.MESSAGE_COMPONENT:
+        elif interaction.type == InteractionType.APPLICATION_COMMAND:
+            try:
+                return await self._commands[interaction.data.name](interaction)
+            except KeyError:
+                return HTTPException(status_code=400)
+        elif interaction.type == InteractionType.MESSAGE_COMPONENT:
             ...
         raise HTTPException(status_code=400)
 
