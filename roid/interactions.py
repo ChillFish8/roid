@@ -57,12 +57,29 @@ class ResolvedData(BaseModel):
     messages: Optional[Dict[int, PartialMessage]]
 
 
+class OptionData(BaseModel):
+    name: str
+    type: CommandOptionType
+    value: Optional[
+        Union[
+            str,
+            int,
+            float,
+            bool,
+        ]
+    ]
+    options: Optional["OptionData"]
+
+
+OptionData.update_forward_refs()
+
+
 class InteractionData(BaseModel):
     id: int
     name: str
     type: CommandType
     resolved: Optional[ResolvedData]
-    options: Optional[List[CommandOption]]
+    options: Optional[List[OptionData]]
     custom_id: Optional[str]
     component_type: Optional[ComponentType]
     values: Optional[List[str]]

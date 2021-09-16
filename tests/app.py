@@ -3,6 +3,7 @@ import uvicorn
 import logging
 
 from roid import SlashCommands, Option
+from roid.objects import PartialChannel, User
 
 logging.basicConfig(level=logging.INFO)
 
@@ -14,10 +15,10 @@ app = SlashCommands(
 
 
 @app.command("say-hello", "wave to me", guild_id=675647130647658527)
-async def test(message: str, specific: int = Option(description="A specific thing")):
-    print(message, specific)
+async def test(message: str, user: User, channel: PartialChannel):
+    print(message, user, channel)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.submit_commands()
     uvicorn.run("app:app", port=8000, host="0.0.0.0")

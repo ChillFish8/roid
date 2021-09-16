@@ -1,8 +1,6 @@
 import asyncio
 import functools
 import inspect
-
-from enum import Enum
 from typing import List, Union, Optional, Any, Tuple, Dict
 
 from pydantic import BaseModel, constr
@@ -56,9 +54,7 @@ OPTION_TYPE_PROCESSOR = {
 }
 
 
-def get_options_from_spec(
-    spec: inspect.FullArgSpec
-) -> List[Tuple[CommandOption, Any]]:
+def get_options_from_spec(spec: inspect.FullArgSpec) -> List[Tuple[CommandOption, Any]]:
     options = []
 
     default_args = {}
@@ -69,7 +65,9 @@ def get_options_from_spec(
     for name, type_ in spec.annotations.items():
         option_type, description = OPTION_TYPE_PROCESSOR.get(type_)
         if option_type is None:
-            raise InvalidCommandOptionType(f"type {type_!r} is not supported for command option types.")
+            raise InvalidCommandOptionType(
+                f"type {type_!r} is not supported for command option types."
+            )
 
         if name in default_args:
             default = default_args[name]
@@ -83,10 +81,7 @@ def get_options_from_spec(
             required = default.default is Ellipsis
 
         opt = CommandOption(
-            name=name,
-            description=description,
-            type=option_type,
-            required=required
+            name=name, description=description, type=option_type, required=required
         )
 
         options.append((opt, default))
@@ -134,7 +129,7 @@ class Command:
             type=cmd_type,
             guild_id=str(guild_id),
             default_permission=default_permissions,
-            options=options
+            options=options,
         )
 
     def __call__(self, interaction: Interaction):
@@ -148,4 +143,3 @@ class Command:
         partial = functools.partial(self.callback, **kwargs)
         loop = asyncio.get_running_loop()
         return loop.run_in_executor(None, partial)
-

@@ -119,7 +119,6 @@ class MemberPermissions(IntEnum):
 
 
 class PartialMember(BaseModel):
-    user: User
     nick: Optional[str] = None
     roles: List[int]
     joined_at: datetime
@@ -175,25 +174,9 @@ class ThreadMember(BaseModel):
 class PartialChannel(BaseModel):
     id: int
     type: ChannelType
-    guild_id: Optional[int] = None
-    position: Optional[int] = None
-    permission_overwrites: Optional[List[PermissionOverwrite]] = None
     name: Optional[str] = None
-    topic: Optional[str] = None
-    nsfw: bool = False
-    last_message_id: Optional[int] = None
-    bitrate: Optional[int]
-    user_limit: Optional[int]
-    rate_limit_per_user: Optional[int]
-    owner_id: Optional[int]
     parent_id: Optional[int]
-    last_pin_timestamp: Optional[datetime] = None
-    rtc_region: Optional[str]
-    video_quality_mode: Optional[int]
-    message_count: Optional[int]
     thread_metadata: Optional[ThreadMetaData]
-    member: Optional[ThreadMember]
-    default_auto_archive_duration: Optional[int]
     permissions: Optional[int]
 
     @property
