@@ -7,7 +7,7 @@ from typing import List, Union, ForwardRef, Callable, Any, Coroutine, Optional
 from pydantic import BaseModel, constr
 
 
-class CommandTypes(IntEnum):
+class CommandType(IntEnum):
     CHAT_INPUT = auto()
     USER = auto()
     MESSAGE = auto()
@@ -44,7 +44,7 @@ CommandOption.update_forward_refs()
 
 
 class CommandContext(BaseModel):
-    type: CommandTypes
+    type: CommandType
     name: constr(max_length=32, min_length=1)
     description: str
     application_id: str
@@ -60,7 +60,7 @@ class Command:
         name: str,
         description: str,
         application_id: int,
-        cmd_type: CommandTypes,
+        cmd_type: CommandType,
         guild_id: Optional[int],
         default_permissions: bool,
         options: Optional[List[CommandOption]],

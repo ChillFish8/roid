@@ -11,9 +11,9 @@ from typing import Dict, List
 from fastapi import FastAPI, Request
 from fastapi.exceptions import HTTPException
 
-from roid.command import CommandTypes, Command, CommandOption
+from roid.command import CommandType, Command, CommandOption
 from roid import exceptions
-from roid.interaction import InteractionType
+from roid.interactions import InteractionType
 
 COMMANDS_ADD = "https://discord.com/api/v8/applications/{application_id}/commands"
 
@@ -101,7 +101,7 @@ class SlashCommands(FastAPI):
         self,
         name: str,
         description: str = "",
-        cmd_type: CommandTypes = CommandTypes.CHAT_INPUT,
+        cmd_type: CommandType = CommandType.CHAT_INPUT,
         guild_id: int = None,
         default_permissions: bool = True,
         options: List[CommandOption] = None,
