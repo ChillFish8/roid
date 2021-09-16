@@ -8,7 +8,7 @@ import logging
 from nacl.signing import VerifyKey
 from nacl.exceptions import BadSignatureError
 
-from typing import Dict, List
+from typing import Dict, List, Any, Optional
 from fastapi import FastAPI, Request
 from fastapi.exceptions import HTTPException
 from pydantic import ValidationError
@@ -22,6 +22,9 @@ COMMANDS_ADD = f"{API_URL}/applications/{{application_id}}/commands"
 GUILD_COMMANDS_ADD = (
     f"{API_URL}/applications/{{application_id}}/guilds/{{guild_id}}/commands"
 )
+
+GET_GLOBAL_COMMANDS = f"{API_URL}/applications/{{application_id}}/commands"
+REMOVE_GLOBAL_COMMAND = f"{API_URL}/applications/{{application_id}}"
 
 logger = logging.getLogger("roid-main")
 
@@ -59,10 +62,11 @@ class SlashCommands(FastAPI):
 
         data = orjson.loads(body)
 
+        logging.debug(f"got payload: {data}")
+
         try:
             interaction = Interaction(**data)
         except ValidationError as e:
-            print(json.dumps(data, indent=4))
             logger.warning(f"rejecting response due to {e!r}")
             return HTTPException(status_code=422, detail=e.errors())
 
@@ -77,46 +81,79 @@ class SlashCommands(FastAPI):
             ...
         raise HTTPException(status_code=400)
 
+    def _request(
+            self, method: str, path: str, headers: dict = None, **extra
+    ) -> httpx.Response:
+        set_headers = {
+            "Authorization": f"Bot {self._token}",
+        }
+
+        if headers is not None:
+            set_headers = {
+                **set_headers,
+                **headers,
+            }
+
+        url = f"{API_URL}/applications/{self.application_id}{path}"
+        r = httpx.request(
+            method,
+            url,
+            headers=set_headers,
+            **extra,
+        )
+        time.sleep(0.5)
+
+        try:
+            r.raise_for_status()
+        except httpx.HTTPStatusError:
+            if r.status_code == 404:
+                raise exceptions.HTTPException(
+                    status=r.status_code,
+                    body=f"Not Found: No route for url: {url!r}",
+                )
+
+            if r.status_code != 400:
+                raise exceptions.HTTPException(status=r.status_code, body=r.text)
+
+            data = r.json()
+            errors = data["errors"]
+
+            sections = []
+            for location, detail in errors.items():
+                message_details = ", ".join(
+                    [item["message"] for item in detail["_errors"]]
+                )
+                sections.append(f"Error @ {location}: {message_details}")
+            raise exceptions.HTTPException(status=400, body="\n".join(sections))
+        return r
+
+    def remove_old_global_commands(self):
+        r = self._request("GET", "/commands")
+        data = r.json()
+
+        for cmd in data:
+            if cmd["name"] in self._commands:
+                continue
+
+            _ = self._request("DELETE", f"/commands/{cmd['id']}")
+
     def submit_commands(self):
-        headers = {
-    "Authorization": f"Bot {self._token}",
-    "Content-Type": "application/json",
-}
+        self.remove_old_global_commands()
 
         for command in self._commands.values():
             logger.info(f"submitting command: {command.ctx!r}")
 
             if command.ctx.guild_id is None:
-                url = COMMANDS_ADD.format(application_id=self.application_id)
+                url = f"/commands"
             else:
-                url = GUILD_COMMANDS_ADD.format(
-                    application_id=self.application_id, guild_id=command.ctx.guild_id
-                )
+                url = f"/guilds/{command.ctx.guild_id}/commands"
 
-            r = httpx.post(
+            self._request(
+                "POST",
                 url,
-                headers=headers,
+                headers={"Content-Type": "application/json"},
                 data=command.ctx.json(),
             )
-
-            try:
-                r.raise_for_status()
-            except httpx.HTTPStatusError:
-                logger.error(f"failed to process command {r!r}")
-
-                if r.status_code == 400:
-                    data = r.json()
-                    errors = data["errors"]
-                    try:
-                        message_details = ", ".join(
-                            [item["message"] for item in errors["name"]["_errors"]]
-                        )
-                    except KeyError:
-                        message_details = str(data)
-                    raise exceptions.CommandRejected(status=400, body=message_details)
-                raise exceptions.HTTPException(status=r.status_code, body=r.text)
-
-            time.sleep(0.5)
 
     def command(
         self,

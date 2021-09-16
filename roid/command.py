@@ -7,7 +7,8 @@ from pydantic import BaseModel, constr
 
 from roid.exceptions import InvalidCommandOptionType
 from roid.interactions import Interaction, CommandType, CommandOption, CommandOptionType
-from roid.objects import User, Role, PartialChannel
+from roid.objects import User, Role, Channel, Member
+from roid.extractors import extract_options
 
 
 class CommandContext(BaseModel):
@@ -47,10 +48,13 @@ OPTION_TYPE_PROCESSOR = {
     float: (CommandOptionType.NUMBER, "Enter any number."),
     str: (CommandOptionType.STRING, "Enter some text."),
     bool: (CommandOptionType.BOOLEAN, "Enter either true or false."),
-    Union[User, Role]: (CommandOptionType.MENTIONABLE, "Select a role or user."),
-    User: (CommandOptionType.USER, "Select a user."),
+    Union[Member, Role]: (
+        CommandOptionType.MENTIONABLE,
+        "Select a role or member.",
+    ),
+    Member: (CommandOptionType.USER, "Select a member."),
     Role: (CommandOptionType.ROLE, "Select a role."),
-    PartialChannel: (CommandOptionType.CHANNEL, "Select a channel"),
+    Channel: (CommandOptionType.CHANNEL, "Select a channel"),
 }
 
 
@@ -132,8 +136,20 @@ class Command:
             options=options,
         )
 
+    def get_option_data(self, interaction: Interaction) -> dict:
+        if interaction.data.options is None:
+            return {}
+
+        options = extract_options(interaction)
+
+        for name, default in self._defaults.items():
+            if name not in options:
+                options[name] = default
+
+        return options
+
     def __call__(self, interaction: Interaction):
-        kwargs = {}
+        kwargs = self.get_option_data(interaction)
         if self._pass_interaction is not None:
             kwargs[self._pass_interaction] = interaction
 

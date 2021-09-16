@@ -2,8 +2,8 @@ import os
 import uvicorn
 import logging
 
-from roid import SlashCommands, Option
-from roid.objects import PartialChannel, User
+from roid import SlashCommands
+from roid.objects import Channel, Member
 
 logging.basicConfig(level=logging.INFO)
 
@@ -15,7 +15,7 @@ app = SlashCommands(
 
 
 @app.command("say-hello", "wave to me", guild_id=675647130647658527)
-async def test(message: str, user: User, channel: PartialChannel):
+async def test(message: str, user: Member, channel: Channel):
     print(message, user, channel)
 
 

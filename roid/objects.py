@@ -118,7 +118,8 @@ class MemberPermissions(IntEnum):
     USE_EXTERNAL_STICKERS = 1 << 37
 
 
-class PartialMember(BaseModel):
+class Member(BaseModel):
+    user: User = None
     nick: Optional[str] = None
     roles: List[int]
     joined_at: datetime
@@ -171,7 +172,7 @@ class ThreadMember(BaseModel):
     flags: int
 
 
-class PartialChannel(BaseModel):
+class Channel(BaseModel):
     id: int
     type: ChannelType
     name: Optional[str] = None
@@ -367,7 +368,7 @@ class PartialMessage(BaseModel):
     channel_id: int
     guild_id: Optional[int]
     author: User
-    member: Optional[PartialMember]
+    member: Optional[Member]
     content: str
     timestamp: datetime
     edited_timestamp: Optional[datetime]
@@ -386,6 +387,6 @@ class PartialMessage(BaseModel):
     activity: Optional[MessageActivity]
     application_id: Optional[int]
     flags: Optional[int]
-    thread: Optional[PartialChannel]
+    thread: Optional[Channel]
     sticker_items: Optional[List[StickerItem]]
     stickers: Optional[List[Sticker]]

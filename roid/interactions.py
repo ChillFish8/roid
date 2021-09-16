@@ -3,7 +3,7 @@ from enum import IntEnum, auto
 
 from pydantic import BaseModel
 
-from roid.objects import User, Role, PartialChannel, PartialMember, PartialMessage
+from roid.objects import User, Role, Channel, Member, PartialMessage
 from roid.components import ComponentType
 
 
@@ -51,9 +51,9 @@ class InteractionType(IntEnum):
 
 class ResolvedData(BaseModel):
     users: Optional[Dict[int, User]]
-    members: Optional[Dict[int, PartialMember]]
+    members: Optional[Dict[int, Member]]
     roles: Optional[Dict[int, Role]]
-    channels: Optional[Dict[int, PartialChannel]]
+    channels: Optional[Dict[int, Channel]]
     messages: Optional[Dict[int, PartialMessage]]
 
 
@@ -93,7 +93,7 @@ class Interaction(BaseModel):
     data: Optional[InteractionData]
     guild_id: Optional[int]
     channel_id: Optional[int]
-    member: Optional[PartialMember]
+    member: Optional[Member]
     user: Optional[User]
     token: str
     version: int
