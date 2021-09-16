@@ -1,3 +1,5 @@
 httpx
 fastapi
 aioredis
+PyNaCl
+orjson
