@@ -2,50 +2,14 @@ import asyncio
 import functools
 import inspect
 
-from enum import IntEnum, auto, Enum
-from typing import List, Union, Optional, Any
+from enum import Enum
+from typing import List, Union, Optional, Any, Tuple, Dict
 
 from pydantic import BaseModel, constr
 
 from roid.exceptions import InvalidCommandOptionType
-from roid.interactions import Interaction
+from roid.interactions import Interaction, CommandType, CommandOption, CommandOptionType
 from roid.objects import User, Role, PartialChannel
-
-
-class CommandType(IntEnum):
-    CHAT_INPUT = auto()
-    USER = auto()
-    MESSAGE = auto()
-
-
-class CommandOptionType(IntEnum):
-    SUB_COMMAND = auto()
-    SUB_COMMAND_GROUP = auto()
-    STRING = auto()
-    INTEGER = auto()
-    BOOLEAN = auto()
-    USER = auto()
-    CHANNEL = auto()
-    ROLE = auto()
-    MENTIONABLE = auto()
-    NUMBER = auto()
-
-
-class CommandChoice(BaseModel):
-    name: str
-    value: Union[str, int, float]
-
-
-class CommandOption(BaseModel):
-    type: CommandOptionType
-    name: str
-    description: str
-    required: bool = False
-    choices: List[CommandChoice] = None
-    options: List["CommandOption"] = None
-
-
-CommandOption.update_forward_refs()
 
 
 class CommandContext(BaseModel):
@@ -61,7 +25,7 @@ class CommandContext(BaseModel):
 class SetOption:
     def __init__(
         self,
-        default: Union[str, int, float, None, bool, ...],
+        default: Union[str, int, float, None, bool],
         name: Optional[str],
         description: Optional[str],
     ):
@@ -83,7 +47,7 @@ def Option(
 OPTION_TYPE_PROCESSOR = {
     int: (CommandOptionType.INTEGER, "Enter any whole number."),
     float: (CommandOptionType.NUMBER, "Enter any number."),
-    str: (CommandOptionType.STRING, "Enter ome text."),
+    str: (CommandOptionType.STRING, "Enter some text."),
     bool: (CommandOptionType.BOOLEAN, "Enter either true or false."),
     Union[User, Role]: (CommandOptionType.MENTIONABLE, "Select a role or user."),
     User: (CommandOptionType.USER, "Select a user."),
@@ -92,33 +56,9 @@ OPTION_TYPE_PROCESSOR = {
 }
 
 
-class Rename(Enum):
-    """
-    How to process the name of the option, this is only really useful when
-    using the parameter based option inference.
-
-    If you're manually defining an option in the parameters via the `Option` type hint
-    this will be ignored.
-
-    - `NONE` - Does not change the name of the option e.g. "foo_bar" -> "foo_bar"
-    - `TITLE` - Splits the name on `_` and applies the `str.title()` method e.g. "foo_bar" -> "Foo Bar"
-    - `CAPITALIZE` - Splits the name on `_` and applies the `str.capitalize()` e.g. "foo_bar" -> "Foo bar"
-    - `UPPER` - Splits the name on `_` and applies the `str.upper()` e.g. "foo_bar" -> "FOO BAR"
-    - `LOWER` - Splits the name on `_` and applies the `str.lower()` e.g. "foo_bar" -> "foo bar"
-    """
-
-    NONE = lambda x: x  # noqa
-    TITLE = lambda x: x.replace("_", " ").title()  # noqa
-    CAPITALIZE = lambda x: x.replace("_", " ").capitalize()  # noqa
-    UPPER = lambda x: x.replace("_", " ").upper()  # noqa
-    LOWER = lambda x: x.replace("_", " ").lower()  # noqa
-
-
 def get_options_from_spec(
-    rename_all: Rename,
     spec: inspect.FullArgSpec
-) -> List[(CommandOption, Any)]:
-
+) -> List[Tuple[CommandOption, Any]]:
     options = []
 
     default_args = {}
@@ -126,22 +66,21 @@ def get_options_from_spec(
         delta = len(spec.args) - len(spec.defaults)
         default_args = dict(zip(spec.args[delta:], spec.defaults))
 
-    for parameter, type_ in spec.annotations:
+    for name, type_ in spec.annotations.items():
         option_type, description = OPTION_TYPE_PROCESSOR.get(type_)
         if option_type is None:
             raise InvalidCommandOptionType(f"type {type_!r} is not supported for command option types.")
 
-        if parameter in default_args:
-            default = default_args[parameter]
+        if name in default_args:
+            default = default_args[name]
         else:
             default = Ellipsis
 
-        name = rename_all.value(parameter)
-        required = default is not Ellipsis
+        required = default is Ellipsis
         if isinstance(default, SetOption):
             name = default.name or name
             description = default.description or description
-            required = default.default is not Ellipsis
+            required = default.default is Ellipsis
 
         opt = CommandOption(
             name=name,
@@ -170,8 +109,8 @@ class Command:
         self.is_coroutine = asyncio.iscoroutinefunction(callback)
         self.callback = callback
 
-        arg_spec = inspect.getfullargspec(self.callback)
-        annotations = arg_spec.annotations
+        spec = inspect.getfullargspec(self.callback)
+        annotations = spec.annotations
 
         self._pass_interaction: Optional[str] = None
         for param, type_ in annotations.items():
@@ -181,6 +120,12 @@ class Command:
 
         if options is None:
             options = []
+
+        self._defaults: Dict[str, Any] = {}
+
+        for option, default in get_options_from_spec(spec):
+            options.append(option)
+            self._defaults[option.name] = default
 
         self.ctx = CommandContext(
             name=name,

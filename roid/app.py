@@ -8,7 +8,7 @@ from nacl.signing import VerifyKey
 from nacl.exceptions import BadSignatureError
 
 from typing import Dict, List
-from fastapi import FastAPI, Request, Body
+from fastapi import FastAPI, Request
 from fastapi.exceptions import HTTPException
 
 from roid.command import CommandType, Command, CommandOption
@@ -95,7 +95,10 @@ class SlashCommands(FastAPI):
                 if r.status_code == 400:
                     data = r.json()
                     errors = data['errors']
-                    message_details = ", ".join([item['message'] for item in errors['name']['_errors']])
+                    try:
+                        message_details = ", ".join([item['message'] for item in errors['name']['_errors']])
+                    except KeyError:
+                        message_details = str(data)
                     raise exceptions.CommandRejected(status=400, body=message_details)
                 raise exceptions.HTTPException(status=r.status_code, body=r.text)
 

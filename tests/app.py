@@ -2,7 +2,7 @@ import os
 import uvicorn
 import logging
 
-from roid import SlashCommands, Interaction
+from roid import SlashCommands, Option
 
 logging.basicConfig(level=logging.INFO)
 
@@ -13,9 +13,9 @@ app = SlashCommands(
 )
 
 
-@app.command("wave", "wave to me", guild_id=675647130647658527)
-async def test(interaction: Interaction):
-    print(interaction)
+@app.command("say-hello", "wave to me", guild_id=675647130647658527)
+async def test(message: str, specific: int = Option(description="A specific thing")):
+    print(message, specific)
 
 
 if __name__ == '__main__':

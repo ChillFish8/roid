@@ -3,9 +3,45 @@ from enum import IntEnum, auto
 
 from pydantic import BaseModel
 
-from roid.command import CommandType, CommandOption
 from roid.objects import User, Role, PartialChannel, PartialMember, PartialMessage
 from roid.components import ComponentType
+
+
+class CommandType(IntEnum):
+    CHAT_INPUT = auto()
+    USER = auto()
+    MESSAGE = auto()
+
+
+class CommandOptionType(IntEnum):
+    SUB_COMMAND = auto()
+    SUB_COMMAND_GROUP = auto()
+    STRING = auto()
+    INTEGER = auto()
+    BOOLEAN = auto()
+    USER = auto()
+    CHANNEL = auto()
+    ROLE = auto()
+    MENTIONABLE = auto()
+    NUMBER = auto()
+
+
+class CommandChoice(BaseModel):
+    name: str
+    value: Union[str, int, float]
+
+
+class CommandOption(BaseModel):
+    type: CommandOptionType
+    name: str
+    description: str
+    required: bool = False
+    choices: List[CommandChoice] = None
+    options: List["CommandOption"] = None
+
+
+CommandOption.update_forward_refs()
+
 
 class InteractionType(IntEnum):
     PING = auto()
