@@ -16,6 +16,7 @@ from roid.command import Command
 from roid.components import ButtonStyle
 from roid.objects import MemberPermissions
 from roid.response import ResponsePayload
+from roid.interactions import Interaction
 
 
 @validate_arguments
@@ -109,7 +110,7 @@ class UserMissingPermissions(CheckError):
 @validate_arguments
 def require_user_permissions(
     flags: Union[int, List[MemberPermissions]],
-    on_reject: Optional[Callable[[Any], ResponsePayload]] = None,
+    on_reject: Optional[Callable[[Interaction], ResponsePayload]] = None,
 ):
     """
     Requires the user has x permissions in order to invoke the command.
@@ -127,7 +128,6 @@ def require_user_permissions(
             callback is ignore.
 
             If this is not None then the interaction data is passed.
-
     """
 
     if isinstance(flags, list):
@@ -141,7 +141,7 @@ def require_user_permissions(
                 f"Did you put the decorators the wrong way around?\n"
             )
 
-        def _permission_check(interaction):
+        def _permission_check(interaction: Interaction):
             if interaction.member is None:
                 return interaction
             if interaction.member.permissions & flags != 0:
