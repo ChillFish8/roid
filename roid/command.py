@@ -1,12 +1,20 @@
 import asyncio
 import functools
 import inspect
+from enum import Enum, IntEnum
 from typing import List, Union, Optional, Any, Tuple, Dict
 
+import typing
 from pydantic import BaseModel, constr
 
 from roid.exceptions import InvalidCommandOptionType
-from roid.interactions import Interaction, CommandType, CommandOption, CommandOptionType
+from roid.interactions import (
+    Interaction,
+    CommandType,
+    CommandOption,
+    CommandOptionType,
+    CommandChoice,
+)
 from roid.objects import User, Role, Channel, Member
 from roid.extractors import extract_options
 
@@ -18,6 +26,7 @@ class CommandContext(BaseModel):
     application_id: str
     guild_id: Optional[str]
     options: Optional[List[CommandOption]]
+    choices: Optional[List[CommandChoice]]
     default_permission: bool
 
 
@@ -43,6 +52,11 @@ def Option(
     return SetOption(default, name, description)
 
 
+VALID_CHOICE_TYPES = (
+    CommandOptionType.STRING,
+    CommandOptionType.NUMBER,
+    CommandOptionType.INTEGER,
+)
 OPTION_TYPE_PROCESSOR = {
     int: (CommandOptionType.INTEGER, "Enter any whole number."),
     float: (CommandOptionType.NUMBER, "Enter any number."),
@@ -58,7 +72,9 @@ OPTION_TYPE_PROCESSOR = {
 }
 
 
-def get_options_from_spec(spec: inspect.FullArgSpec) -> List[Tuple[CommandOption, Any]]:
+def get_details_from_spec(
+    spec: inspect.FullArgSpec,
+) -> List[Tuple[CommandOption, Any]]:
     options = []
 
     default_args = {}
@@ -67,27 +83,72 @@ def get_options_from_spec(spec: inspect.FullArgSpec) -> List[Tuple[CommandOption
         default_args = dict(zip(spec.args[delta:], spec.defaults))
 
     for name, type_ in spec.annotations.items():
-        option_type, description = OPTION_TYPE_PROCESSOR.get(type_)
-        if option_type is None:
+        choice_blocks = []
+
+        original = typing.get_origin(type_)
+        if original is typing.Literal:
+            target_type = None
+            for v in typing.get_args(type_):
+                if target_type is None:
+                    target_type = type(v)
+                elif type(v) is not target_type:
+                    raise TypeError(
+                        f"(parameter: {name!r}) literal must be the same type."
+                    )
+
+                choice_blocks.append(CommandChoice(name=v, value=v))
+            type_ = target_type
+        elif type(type_) in (Enum, IntEnum):
+            cls = type(type_)
+
+            target_type = None
+            for e in cls:
+                if target_type is None:
+                    target_type = type(e.value)
+                elif type(e.value) is not target_type:
+                    raise TypeError(
+                        f"(parameter: {name!r}) enum must contain all the same types."
+                    )
+
+                choice_blocks.append(CommandChoice(name=str(e.value), value=e.value))
+            type_ = target_type
+
+        result = OPTION_TYPE_PROCESSOR.get(type_)
+        if result is None:
             raise InvalidCommandOptionType(
-                f"type {type_!r} is not supported for command option types."
+                f"type {type_!r} is not supported for command option / choice types."
             )
 
+        option_type, description = result
         if name in default_args:
             default = default_args[name]
         else:
             default = Ellipsis
 
         required = default is Ellipsis
-        if isinstance(default, SetOption):
+        if isinstance(default, (SetOption,)):
             name = default.name or name
             description = default.description or description
             required = default.default is Ellipsis
+        elif len(choice_blocks) > 0:
+            description = "Select an option from the list."
 
-        opt = CommandOption(
-            name=name, description=description, type=option_type, required=required
+        kwargs = dict(
+            name=name,
+            description=description,
+            type=option_type,
+            required=required,
         )
 
+        if (len(choice_blocks) > 0) and (option_type not in VALID_CHOICE_TYPES):
+            raise InvalidCommandOptionType(
+                f"{type_!r} cannot be inferred for a choices option"
+            )
+
+        if len(choice_blocks) > 0:
+            kwargs["choices"] = choice_blocks
+
+        opt = CommandOption(**kwargs)
         options.append((opt, default))
 
     return options
@@ -103,7 +164,6 @@ class Command:
         cmd_type: CommandType,
         guild_id: Optional[int],
         default_permissions: bool,
-        options: Optional[List[CommandOption]],
     ):
         self.is_coroutine = asyncio.iscoroutinefunction(callback)
         self.callback = callback
@@ -117,14 +177,12 @@ class Command:
                 self._pass_interaction = param
                 break
 
-        if options is None:
-            options = []
-
+        options = []
         self._defaults: Dict[str, Any] = {}
 
-        for option, default in get_options_from_spec(spec):
-            options.append(option)
-            self._defaults[option.name] = default
+        for option, default in get_details_from_spec(spec):
+    options.append(option)
+    self._defaults[option.name] = default
 
         self.ctx = CommandContext(
             name=name,
@@ -133,7 +191,7 @@ class Command:
             type=cmd_type,
             guild_id=str(guild_id),
             default_permission=default_permissions,
-            options=options,
+            options=options if len(options) != 0 else None,
         )
 
     def get_option_data(self, interaction: Interaction) -> dict:

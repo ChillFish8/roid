@@ -162,7 +162,6 @@ class SlashCommands(FastAPI):
         cmd_type: CommandType = CommandType.CHAT_INPUT,
         guild_id: int = None,
         default_permissions: bool = True,
-        options: List[CommandOption] = None,
     ):
         def wrapper(func):
             cmd = Command(
@@ -173,7 +172,6 @@ class SlashCommands(FastAPI):
                 cmd_type=cmd_type,
                 guild_id=guild_id,
                 default_permissions=default_permissions,
-                options=options,
             )
 
             self._commands[name] = cmd
