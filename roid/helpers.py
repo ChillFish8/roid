@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from functools import reduce
 from operator import or_
-from typing import Optional, Union, List, Callable, Any
+from typing import Optional, Union, List, Callable
 
 from pydantic import AnyHttpUrl, conint, validate_arguments
 
@@ -17,6 +17,10 @@ from roid.components import ButtonStyle
 from roid.objects import MemberPermissions
 from roid.response import ResponsePayload
 from roid.interactions import Interaction
+
+
+def _null():
+    pass
 
 
 @validate_arguments
@@ -50,7 +54,7 @@ def hyperlink_button(
             custom_id=custom_id,
             disabled=disabled,
             url=url,
-        )(func)
+        )(_null)
 
         return func
 

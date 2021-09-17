@@ -259,10 +259,14 @@ class Command:
         self,
         style: ButtonStyle,
         *,
-        row: Optional[conint(ge=1, le=5)] = None,
-        inline: bool = True,
         custom_id: Optional[str] = None,
         disabled: bool = False,
+        row: Optional[conint(ge=1, le=5)] = None,
+        inline: bool = True,
+        label: str = None,
+        emoji: constr(
+            strip_whitespace=True, regex="(<a?:[a-zA-Z0-9]+:[0-9]{17,26}>)"
+        ) = None,
         url: Optional[AnyHttpUrl] = None,
     ):
         def wrapper(func):
@@ -275,8 +279,12 @@ class Command:
         self,
         *,
         custom_id: Optional[str] = None,
+        disabled: bool = False,
+        row: Optional[conint(ge=1, le=5)] = None,
+        inline: bool = True,
         placeholder: str = "Select an option.",
         min_values: conint(ge=0, le=25) = 1,
+        max_values: conint(ge=0, le=25) = 1,
     ):
         def wrapper(func):
             ...

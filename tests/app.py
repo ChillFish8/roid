@@ -1,11 +1,11 @@
 import os
 from enum import Enum
-from typing import List, Literal
-
 import uvicorn
 import logging
 
 from roid import SlashCommands, response, Embed
+from roid.objects import MemberPermissions
+from roid.helpers import require_user_permissions
 
 logging.basicConfig(level=logging.INFO)
 
@@ -18,19 +18,22 @@ app = SlashCommands(
 
 class TestAnimal(Enum):
     Cow = "Cow"
-    Number = "123"
+    Pig = "Pig"
 
 
+@require_user_permissions(MemberPermissions.ADMINISTRATOR)
 @app.command("say-hello", "wave to me", guild_id=675647130647658527)
-async def test():
+async def test(animal: TestAnimal):
     return response(
-        embed=Embed(title="Hello, world", color=0xFFFFF),
+        embed=Embed(title=f"Hello, world: {animal.value}", color=0xFFFFF),
     )
 
 
-# @test.button("Click Me", style="Primary")
-# async def test_button_click():
-#     ...
+@test.button(style="Primary", label="Click me", emoji="aaa")
+async def test_button_click():
+    ...
+
+
 #
 #
 # class TestSelect(Enum):
