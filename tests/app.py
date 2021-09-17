@@ -17,11 +17,14 @@ app = SlashCommands(
 )
 
 
+class TestAnimal(Enum):
+    Cow = "Cow"
+    Number = "123"
+
+
 @app.command("say-hello", "wave to me", guild_id=675647130647658527)
-async def test(
-        message: str, user: Member, channel: Channel, animal: Literal["Cow", 123]
-):
-    print(message, user, channel, animal)
+async def test(message: str, user: Member, channel: Channel, animal: TestAnimal):
+    print(message, user, channel, type(animal))
 
 
 # @test.button("Click Me", style="Primary")

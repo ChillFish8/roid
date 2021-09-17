@@ -61,6 +61,7 @@ class SlashCommands(FastAPI):
             raise HTTPException(status_code=401)
 
         data = orjson.loads(body)
+        print(json.dumps(data, indent=4))
 
         logging.debug(f"got payload: {data}")
 

@@ -30,7 +30,7 @@ class CommandContext(BaseModel):
     default_permission: bool
 
 
-class SetOption:
+class SetValue:
     def __init__(
         self,
         default: Union[str, int, float, None, bool],
@@ -49,7 +49,7 @@ def Option(
     name: str = None,
     description: str = None,
 ) -> Any:  # noqa
-    return SetOption(default, name, description)
+    return SetValue(default, name, description)
 
 
 VALID_CHOICE_TYPES = (
@@ -73,7 +73,8 @@ OPTION_TYPE_PROCESSOR = {
 
 
 def get_details_from_spec(
-    spec: inspect.FullArgSpec,
+        cmd_name: str,
+        spec: inspect.FullArgSpec,
 ) -> List[Tuple[CommandOption, Any]]:
     options = []
 
@@ -93,21 +94,19 @@ def get_details_from_spec(
                     target_type = type(v)
                 elif type(v) is not target_type:
                     raise TypeError(
-                        f"(parameter: {name!r}) literal must be the same type."
+                        f"(command: {cmd_name!r}, parameter: {name!r}) literal must be the same type."
                     )
 
                 choice_blocks.append(CommandChoice(name=v, value=v))
             type_ = target_type
-        elif type(type_) in (Enum, IntEnum):
-            cls = type(type_)
-
+        elif issubclass(type_, (Enum, IntEnum)):
             target_type = None
-            for e in cls:
+            for e in type_:
                 if target_type is None:
                     target_type = type(e.value)
                 elif type(e.value) is not target_type:
                     raise TypeError(
-                        f"(parameter: {name!r}) enum must contain all the same types."
+                        f"(command: {cmd_name!r}, parameter: {name!r}) enum must contain all the same types."
                     )
 
                 choice_blocks.append(CommandChoice(name=str(e.value), value=e.value))
@@ -116,7 +115,7 @@ def get_details_from_spec(
         result = OPTION_TYPE_PROCESSOR.get(type_)
         if result is None:
             raise InvalidCommandOptionType(
-                f"type {type_!r} is not supported for command option / choice types."
+                f"(command: {cmd_name!r}) type {type_!r} is not supported for command option / choice types."
             )
 
         option_type, description = result
@@ -126,10 +125,10 @@ def get_details_from_spec(
             default = Ellipsis
 
         required = default is Ellipsis
-        if isinstance(default, (SetOption,)):
-            name = default.name or name
-            description = default.description or description
-            required = default.default is Ellipsis
+        if isinstance(default, SetValue):
+    name = default.name or name
+    description = default.description or description
+    required = default.default is Ellipsis
         elif len(choice_blocks) > 0:
             description = "Select an option from the list."
 
@@ -179,10 +178,19 @@ class Command:
 
         options = []
         self._defaults: Dict[str, Any] = {}
+        self._choice_conversion: Dict[str, Enum] = {}
 
-        for option, default in get_details_from_spec(spec):
-    options.append(option)
-    self._defaults[option.name] = default
+        for option, default in get_details_from_spec(name, spec):
+            options.append(option)
+            self._defaults[option.name] = default
+
+            if option.choices is None:
+                continue
+
+            annotation = spec.annotations[option.name]
+
+            if issubclass(annotation, Enum):
+                self._choice_conversion[option.name] = annotation
 
         self.ctx = CommandContext(
             name=name,
@@ -198,7 +206,7 @@ class Command:
         if interaction.data.options is None:
             return {}
 
-        options = extract_options(interaction)
+        options = extract_options(interaction, self._choice_conversion)
 
         for name, default in self._defaults.items():
             if name not in options:
