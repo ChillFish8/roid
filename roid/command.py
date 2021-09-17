@@ -73,8 +73,8 @@ OPTION_TYPE_PROCESSOR = {
 
 
 def get_details_from_spec(
-        cmd_name: str,
-        spec: inspect.FullArgSpec,
+    cmd_name: str,
+    spec: inspect.FullArgSpec,
 ) -> List[Tuple[CommandOption, Any]]:
     options = []
 
@@ -126,9 +126,9 @@ def get_details_from_spec(
 
         required = default is Ellipsis
         if isinstance(default, SetValue):
-    name = default.name or name
-    description = default.description or description
-    required = default.default is Ellipsis
+            name = default.name or name
+            description = default.description or description
+            required = default.default is Ellipsis
         elif len(choice_blocks) > 0:
             description = "Select an option from the list."
 

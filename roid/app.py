@@ -83,7 +83,7 @@ class SlashCommands(FastAPI):
         raise HTTPException(status_code=400)
 
     def _request(
-            self, method: str, path: str, headers: dict = None, **extra
+        self, method: str, path: str, headers: dict = None, **extra
     ) -> httpx.Response:
         set_headers = {
             "Authorization": f"Bot {self._token}",
