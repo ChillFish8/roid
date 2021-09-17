@@ -5,7 +5,7 @@ from typing import List, Literal
 import uvicorn
 import logging
 
-from roid import SlashCommands
+from roid import SlashCommands, response, ResponseFlags
 from roid.objects import Channel, Member
 
 logging.basicConfig(level=logging.INFO)
@@ -24,7 +24,10 @@ class TestAnimal(Enum):
 
 @app.command("say-hello", "wave to me", guild_id=675647130647658527)
 async def test(message: str, user: Member, channel: Channel, animal: Literal["cow"]):
-    print(message, user, channel, type(animal))
+    return response(
+        content=f"Got: {message}, user: {user!r}, channel: {channel!r} animal: {animal}",
+        flags=ResponseFlags.EPHEMERAL,
+    )
 
 
 # @test.button("Click Me", style="Primary")

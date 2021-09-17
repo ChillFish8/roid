@@ -6,7 +6,7 @@ from pydantic import BaseModel, constr
 from roid.objects import Embed
 
 
-class CallbackType(IntEnum):
+class ResponseType(IntEnum):
     PONG = 1
     CHANNEL_MESSAGE_WITH_SOURCE = 4
     DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE = 5
@@ -14,7 +14,11 @@ class CallbackType(IntEnum):
     UPDATE_MESSAGE = 7
 
 
-class CallbackData(BaseModel):
+class ResponseFlags(IntEnum):
+    EPHEMERAL = 1 << 6
+
+
+class ResponseData(BaseModel):
     tts: Optional[bool]
     content: Optional[constr(min_length=1, max_length=2000, strip_whitespace=True)]
     embeds: Optional[List[Embed]]
@@ -23,8 +27,8 @@ class CallbackData(BaseModel):
 
 
 class ResponsePayload(BaseModel):
-    type: CallbackType
-    data: Optional[CallbackData] = None
+    type: ResponseType
+    data: Optional[ResponseData] = None
 
 
 def response(
@@ -41,7 +45,7 @@ def response(
     if embed is not None:
         embeds.append(embed)
 
-    data = CallbackData(
+    data = ResponseData(
         tts=tts,
         allowed_mentions=allowed_mentions,
         flags=flags,
@@ -49,4 +53,4 @@ def response(
         content=content,
     )
 
-    return ResponsePayload(type=CallbackType.CHANNEL_MESSAGE_WITH_SOURCE, data=data)
+    return ResponsePayload(type=ResponseType.CHANNEL_MESSAGE_WITH_SOURCE, data=data)
