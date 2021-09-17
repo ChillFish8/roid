@@ -162,7 +162,11 @@ class PermissionOverwrite(BaseModel):
 
 
 class ThreadMetaData(BaseModel):
-    ...
+    archived: bool
+    auto_archive_duration: int
+    archive_timestamp: datetime
+    locked: bool
+    invitable: bool = False
 
 
 class ThreadMember(BaseModel):
