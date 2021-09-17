@@ -17,3 +17,11 @@ class SelectOption(BaseModel):
     description: Optional[str] = None
     emoji: Optional[PartialEmoji]
     default: bool = False
+
+
+class ButtonStyle(IntEnum):
+    PRIMARY = auto()
+    SECONDARY = auto()
+    SUCCESS = auto()
+    Danger = auto()
+    Link = auto()

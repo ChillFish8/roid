@@ -5,7 +5,7 @@ from enum import Enum, IntEnum
 from typing import List, Union, Optional, Any, Tuple, Dict
 
 import typing
-from pydantic import BaseModel, constr, validate_arguments
+from pydantic import BaseModel, constr, validate_arguments, conint, AnyHttpUrl
 
 from roid.exceptions import InvalidCommandOptionType
 from roid.interactions import (
@@ -17,6 +17,7 @@ from roid.interactions import (
 )
 from roid.objects import Role, Channel, Member
 from roid.extractors import extract_options
+from roid.components import ButtonStyle
 
 
 class CommandContext(BaseModel):
@@ -161,9 +162,9 @@ class Command:
         name: str,
         description: str,
         application_id: int,
-        cmd_type: CommandType,
-        guild_id: Optional[int],
-        default_permissions: bool,
+        default_permissions: bool = False,
+        guild_id: Optional[int] = None,
+        cmd_type: CommandType = CommandType.CHAT_INPUT,
     ):
         self.is_coroutine = asyncio.iscoroutinefunction(callback)
         self.callback = callback
@@ -222,3 +223,32 @@ class Command:
         partial = functools.partial(self.callback, **kwargs)
         loop = asyncio.get_running_loop()
         return loop.run_in_executor(None, partial)
+
+    @validate_arguments
+    def button(
+        self,
+        style: ButtonStyle,
+        *,
+        row: Optional[conint(ge=1, le=5)] = None,
+        inline: bool = True,
+        custom_id: Optional[str] = None,
+        disabled: bool = False,
+        url: Optional[AnyHttpUrl] = None,
+    ):
+        def wrapper(func):
+            ...
+
+        return wrapper
+
+    @validate_arguments
+    def select(
+        self,
+        *,
+        custom_id: Optional[str] = None,
+        placeholder: str = "Select an option.",
+        min_values: conint(ge=0, le=25) = 1,
+    ):
+        def wrapper(func):
+            ...
+
+        return wrapper

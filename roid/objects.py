@@ -4,7 +4,7 @@ from functools import reduce
 from operator import or_
 from typing import Optional, List, Union
 
-from pydantic import BaseModel, constr, validate_arguments
+from pydantic import BaseModel, constr, validate_arguments, AnyHttpUrl
 
 from roid.config import CDN_DOMAIN
 
@@ -186,7 +186,19 @@ class Channel(BaseModel):
 
     @property
     def is_dm(self) -> bool:
-        return self.guild_id is None
+        return self.type == ChannelType.DM
+
+    @property
+    def is_category(self) -> bool:
+        return self.type == ChannelType.GUILD_CATEGORY
+
+    @property
+    def is_thread(self) -> bool:
+        return self.type in (
+            ChannelType.GUILD_NEWS_THREAD,
+            ChannelType.GUILD_PUBLIC_THREAD,
+            ChannelType.GUILD_PRIVATE_THREAD,
+        )
 
 
 class ChannelMention(BaseModel):
@@ -201,8 +213,8 @@ class Attachment(BaseModel):
     filename: str
     content_type: Optional[str]
     size: int
-    url: str
-    proxy_url: str
+    url: AnyHttpUrl
+    proxy_url: AnyHttpUrl
     height: Optional[int]
     width: Optional[int]
 
@@ -218,34 +230,34 @@ class EmbedType(Enum):
 
 class EmbedFooter(BaseModel):
     text: constr(min_length=1, max_length=2048, strip_whitespace=True)
-    icon_url: Optional[str]
-    proxy_icon_url: Optional[str]
+    icon_url: Optional[AnyHttpUrl]
+    proxy_icon_url: Optional[AnyHttpUrl]
 
 
 class EmbedImage(BaseModel):
-    url: str
-    proxy_url: Optional[str]
+    url: AnyHttpUrl
+    proxy_url: Optional[AnyHttpUrl]
     height: Optional[int]
     width: Optional[int]
 
 
 class EmbedVideo(BaseModel):
-    url: Optional[str]
-    proxy_url: Optional[str]
+    url: Optional[AnyHttpUrl]
+    proxy_url: Optional[AnyHttpUrl]
     height: Optional[int]
     width: Optional[int]
 
 
 class EmbedProvider(BaseModel):
     name: Optional[str]
-    url: Optional[str]
+    url: Optional[AnyHttpUrl]
 
 
 class EmbedAuthor(BaseModel):
     name: constr(min_length=1, max_length=256, strip_whitespace=True)
-    url: Optional[str]
-    icon_url: Optional[str]
-    proxy_icon_url: Optional[str]
+    url: Optional[AnyHttpUrl]
+    icon_url: Optional[AnyHttpUrl]
+    proxy_icon_url: Optional[AnyHttpUrl]
 
 
 class EmbedField(BaseModel):
@@ -258,7 +270,7 @@ class Embed(BaseModel):
     title: Optional[constr(min_length=1, max_length=256, strip_whitespace=True)]
     type: Optional[EmbedType]
     description: Optional[constr(min_length=1, max_length=4096, strip_whitespace=True)]
-    url: Optional[str]
+    url: Optional[AnyHttpUrl]
     timestamp: Optional[datetime]
     color: Optional[int]
     footer: Optional[EmbedFooter]

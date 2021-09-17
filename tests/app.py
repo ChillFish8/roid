@@ -5,8 +5,7 @@ from typing import List, Literal
 import uvicorn
 import logging
 
-from roid import SlashCommands, response, ResponseFlags, Embed
-from roid.objects import Channel, Member
+from roid import SlashCommands, response, Embed
 
 logging.basicConfig(level=logging.INFO)
 
