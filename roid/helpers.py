@@ -1,10 +1,11 @@
+from __future__ import annotations
+
 from functools import reduce
 from operator import or_
-from typing import Optional, Union, List, Callable
+from typing import Optional, Union, List, Callable, Any
 
 from pydantic import AnyHttpUrl, conint, validate_arguments
 
-from roid import Interaction
 from roid.checks import (
     SyncOrAsyncCallableError,
     SyncOrAsyncCallable,
@@ -108,7 +109,7 @@ class UserMissingPermissions(CheckError):
 @validate_arguments
 def require_user_permissions(
     flags: Union[int, List[MemberPermissions]],
-    on_reject: Optional[Callable[[Interaction], ResponsePayload]] = None,
+    on_reject: Optional[Callable[[Any], ResponsePayload]] = None,
 ):
     """
     Requires the user has x permissions in order to invoke the command.
@@ -123,7 +124,10 @@ def require_user_permissions(
             the flags or a list of MemberPermissions (Which will be implicitly converted)
         on_reject:
             The callback to be invoked should the check fail, if this is None the
-            ``
+            callback is ignore.
+
+            If this is not None then the interaction data is passed.
+
     """
 
     if isinstance(flags, list):
@@ -137,7 +141,7 @@ def require_user_permissions(
                 f"Did you put the decorators the wrong way around?\n"
             )
 
-        def _permission_check(interaction: Interaction):
+        def _permission_check(interaction):
             if interaction.member is None:
                 return interaction
             if interaction.member.permissions & flags != 0:

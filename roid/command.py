@@ -20,7 +20,7 @@ from roid.objects import Role, Channel, Member
 from roid.extractors import extract_options
 from roid.components import ButtonStyle
 from roid.checks import CommandCheck
-from roid.response import ResponsePayload, response
+from roid.response import ResponsePayload
 
 
 class CommandContext(BaseModel):

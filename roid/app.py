@@ -8,7 +8,7 @@ import logging
 from nacl.signing import VerifyKey
 from nacl.exceptions import BadSignatureError
 
-from typing import Dict, List
+from typing import Dict, List, Type, Callable
 from fastapi import FastAPI, Request
 from fastapi.exceptions import HTTPException
 from pydantic import ValidationError
@@ -17,6 +17,8 @@ from roid.command import CommandType, Command
 from roid import exceptions
 from roid.interactions import InteractionType, Interaction
 from roid.config import API_URL
+from roid.error_handlers import KNOWN_ERRORS
+from roid.response import ResponsePayload
 
 COMMANDS_ADD = f"{API_URL}/applications/{{application_id}}/commands"
 GUILD_COMMANDS_ADD = (
@@ -38,16 +40,42 @@ class SlashCommands(FastAPI):
         self._verify_key = VerifyKey(bytes.fromhex(application_public_key))
         self._application_id = application_id
         self._token = token
+        self._global_error_handlers = KNOWN_ERRORS
 
         self._commands: Dict[str, Command] = {}
 
-        self.post("/", name="Interaction Events")(self.root)
+        self.post("/", name="Interaction Events")(self._root)
 
     @property
     def application_id(self):
         return self._application_id
 
-    async def root(self, request: Request):
+    def register_error(
+        self,
+        error: Type[Exception],
+        callback: Callable[[Exception], ResponsePayload],
+    ):
+        """
+        Registers a given error type to a handler.
+
+        This means that if an error is raised by the system that matches the given
+        exception type the callback will be invoked and it's response sent back.
+
+        The traceback is not logged if this is set.
+
+        Args:
+            error:
+                The error type itself, this must inherit from `Exception`.
+            callback:
+                The callback to handle the error and return a response.
+        """
+
+        if not issubclass(error, Exception):
+            raise TypeError("error type does not inherit from `Exception`")
+
+        self._global_error_handlers[error] = callback
+
+    async def _root(self, request: Request):
         try:
             signature = request.headers["X-Signature-Ed25519"]
             timestamp = request.headers["X-Signature-Timestamp"]
@@ -72,10 +100,18 @@ class SlashCommands(FastAPI):
         if interaction.type == InteractionType.PING:
             return {"type": 1}
         elif interaction.type == InteractionType.APPLICATION_COMMAND:
+            cmd = self._commands.get(interaction.data.name)
+            if cmd is None:
+                return HTTPException(status_code=400, detail="No command found")
+
             try:
-                return await self._commands[interaction.data.name](interaction)
-            except KeyError:
-                return HTTPException(status_code=400)
+                return await cmd(interaction)
+            except Exception as e:
+                handler = self._global_error_handlers.get(type(e))
+                if handler is not None:
+                    return handler(e)
+                raise e
+
         elif interaction.type == InteractionType.MESSAGE_COMPONENT:
             ...
         raise HTTPException(status_code=400)
