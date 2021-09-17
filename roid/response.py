@@ -32,7 +32,7 @@ class ResponsePayload(BaseModel):
 
 
 def response(
-    content: str = "",
+    content: str = None,
     *,
     embed: Embed = None,
     embeds: List[Embed] = None,
