@@ -13,7 +13,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import HTTPException
 from pydantic import ValidationError
 
-from roid.command import CommandType, Command, CommandOption
+from roid.command import CommandType, Command
 from roid import exceptions
 from roid.interactions import InteractionType, Interaction
 from roid.config import API_URL
@@ -61,8 +61,6 @@ class SlashCommands(FastAPI):
             raise HTTPException(status_code=401)
 
         data = orjson.loads(body)
-        print(json.dumps(data, indent=4))
-
         logging.debug(f"got payload: {data}")
 
         try:

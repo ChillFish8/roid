@@ -5,7 +5,7 @@ from enum import Enum, IntEnum
 from typing import List, Union, Optional, Any, Tuple, Dict
 
 import typing
-from pydantic import BaseModel, constr
+from pydantic import BaseModel, constr, validate_arguments
 
 from roid.exceptions import InvalidCommandOptionType
 from roid.interactions import (
@@ -15,7 +15,7 @@ from roid.interactions import (
     CommandOptionType,
     CommandChoice,
 )
-from roid.objects import User, Role, Channel, Member
+from roid.objects import Role, Channel, Member
 from roid.extractors import extract_options
 
 
@@ -57,6 +57,7 @@ VALID_CHOICE_TYPES = (
     CommandOptionType.NUMBER,
     CommandOptionType.INTEGER,
 )
+
 OPTION_TYPE_PROCESSOR = {
     int: (CommandOptionType.INTEGER, "Enter any whole number."),
     float: (CommandOptionType.NUMBER, "Enter any number."),
@@ -178,7 +179,6 @@ class Command:
 
         options = []
         self._defaults: Dict[str, Any] = {}
-        self._choice_conversion: Dict[str, Enum] = {}
 
         for option, default in get_details_from_spec(name, spec):
             options.append(option)
@@ -186,11 +186,6 @@ class Command:
 
             if option.choices is None:
                 continue
-
-            annotation = spec.annotations[option.name]
-
-            if issubclass(annotation, Enum):
-                self._choice_conversion[option.name] = annotation
 
         self.ctx = CommandContext(
             name=name,
@@ -202,11 +197,13 @@ class Command:
             options=options if len(options) != 0 else None,
         )
 
+        self.callback = validate_arguments(self.callback)
+
     def get_option_data(self, interaction: Interaction) -> dict:
         if interaction.data.options is None:
             return {}
 
-        options = extract_options(interaction, self._choice_conversion)
+        options = extract_options(interaction)
 
         for name, default in self._defaults.items():
             if name not in options:

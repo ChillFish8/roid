@@ -23,7 +23,7 @@ class TestAnimal(Enum):
 
 
 @app.command("say-hello", "wave to me", guild_id=675647130647658527)
-async def test(message: str, user: Member, channel: Channel, animal: TestAnimal):
+async def test(message: str, user: Member, channel: Channel, animal: Literal["cow"]):
     print(message, user, channel, type(animal))
 
 

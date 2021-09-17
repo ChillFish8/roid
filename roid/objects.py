@@ -4,7 +4,7 @@ from functools import reduce
 from operator import or_
 from typing import Optional, List, Union
 
-from pydantic import BaseModel
+from pydantic import BaseModel, constr, validate_arguments
 
 from roid.config import CDN_DOMAIN
 
@@ -217,7 +217,7 @@ class EmbedType(Enum):
 
 
 class EmbedFooter(BaseModel):
-    text: str
+    text: constr(min_length=1, max_length=2048, strip_whitespace=True)
     icon_url: Optional[str]
     proxy_icon_url: Optional[str]
 
@@ -242,32 +242,67 @@ class EmbedProvider(BaseModel):
 
 
 class EmbedAuthor(BaseModel):
-    name: str
+    name: constr(min_length=1, max_length=256, strip_whitespace=True)
     url: Optional[str]
     icon_url: Optional[str]
     proxy_icon_url: Optional[str]
 
 
 class EmbedField(BaseModel):
-    name: str
-    value: str
+    name: constr(min_length=1, max_length=256, strip_whitespace=True)
+    value: constr(min_length=1, max_length=1024, strip_whitespace=True)
     inline: bool = False
 
 
 class Embed(BaseModel):
-    title: Optional[str]
+    title: Optional[constr(min_length=1, max_length=256, strip_whitespace=True)]
     type: Optional[EmbedType]
-    description: Optional[str]
+    description: Optional[constr(min_length=1, max_length=4096, strip_whitespace=True)]
     url: Optional[str]
     timestamp: Optional[datetime]
-    color: int
+    color: Optional[int]
     footer: Optional[EmbedFooter]
     image: Optional[EmbedImage]
     thumbnail: Optional[EmbedImage]
     video: Optional[EmbedVideo]
     provider: Optional[EmbedProvider]
-    author: Optional[EmbedFooter]
+    author: Optional[EmbedAuthor]
     fields: Optional[List[EmbedField]]
+
+    @validate_arguments
+    def set_image(self, *, url: str):
+        self.image = EmbedImage(url=url)
+
+    @validate_arguments
+    def set_footer(
+        self,
+        text: constr(min_length=1, max_length=2048, strip_whitespace=True),
+        *,
+        icon_url: Optional[str] = None,
+        timestamp: Optional[datetime] = None,
+    ):
+        self.footer = EmbedFooter(text=text, icon_url=icon_url)
+        self.timestamp = timestamp
+
+    @validate_arguments
+    def set_author(
+        self,
+        name: constr(min_length=1, max_length=256, strip_whitespace=True),
+        *,
+        url: Optional[str] = None,
+        icon_url: Optional[str] = None,
+    ):
+        self.author = EmbedAuthor(name=name, url=url, icon_url=icon_url)
+
+    @validate_arguments
+    def add_field(
+        self,
+        *,
+        name: constr(min_length=1, max_length=256, strip_whitespace=True),
+        value: constr(min_length=1, max_length=1024, strip_whitespace=True),
+        inline: bool = False,
+    ):
+        self.fields.append(EmbedField(name=name, value=value, inline=inline))
 
 
 class PartialEmoji(BaseModel):

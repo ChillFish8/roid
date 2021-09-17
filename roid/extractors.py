@@ -1,5 +1,4 @@
-from enum import Enum
-from typing import Union, Any, Dict
+from typing import Union, Any
 
 from roid.interactions import CommandOptionType, Interaction
 from roid.objects import Channel, Member, Role
@@ -44,16 +43,11 @@ OPTION_EXTRACTORS = {
 }
 
 
-def extract_options(interaction: Interaction, enums: Dict[str, Any]) -> dict:
+def extract_options(interaction: Interaction) -> dict:
     out = {}
     for option in interaction.data.options:
         if option.value is None:
             continue
 
-        opt = OPTION_EXTRACTORS[option.type](interaction, option.value)
-
-        enum = enums.get(option.name)
-        if enum is not None:
-            opt = enum(opt)
-        out[option.name] = opt
+        out[option.name] = OPTION_EXTRACTORS[option.type](interaction, option.value)
     return out
