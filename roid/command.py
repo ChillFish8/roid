@@ -1,10 +1,11 @@
 import asyncio
 import functools
 import inspect
-from enum import Enum, IntEnum
-from typing import List, Union, Optional, Any, Tuple, Dict
-
 import typing
+
+from enum import Enum, IntEnum
+from typing import List, Union, Optional, Any, Tuple, Dict, Callable, Coroutine
+
 from pydantic import BaseModel, constr, validate_arguments, conint, AnyHttpUrl
 
 from roid.exceptions import InvalidCommandOptionType
@@ -18,6 +19,8 @@ from roid.interactions import (
 from roid.objects import Role, Channel, Member
 from roid.extractors import extract_options
 from roid.components import ButtonStyle
+from roid.checks import CommandCheck
+from roid.response import ResponsePayload, response
 
 
 class CommandContext(BaseModel):
@@ -155,6 +158,10 @@ def get_details_from_spec(
     return options
 
 
+async def default_on_error(_: Interaction, exception: Exception) -> ResponsePayload:
+    raise exception
+
+
 class Command:
     def __init__(
         self,
@@ -199,8 +206,10 @@ class Command:
         )
 
         self.callback = validate_arguments(self.callback)
+        self._checks_pipeline: List[CommandCheck] = []
+        self._on_error = default_on_error
 
-    def get_option_data(self, interaction: Interaction) -> dict:
+    def _get_option_data(self, interaction: Interaction) -> dict:
         if interaction.data.options is None:
             return {}
 
@@ -213,16 +222,37 @@ class Command:
         return options
 
     def __call__(self, interaction: Interaction):
-        kwargs = self.get_option_data(interaction)
+        return self._run_checks_pipeline(interaction)
+
+    def add_check(self, check: CommandCheck):
+        self._checks_pipeline.append(check)
+
+    async def _invoke(self, interaction: Interaction) -> ResponsePayload:
+        kwargs = self._get_option_data(interaction)
         if self._pass_interaction is not None:
             kwargs[self._pass_interaction] = interaction
 
         if self.is_coroutine:
-            return self.callback(**kwargs)
+            return await self.callback(**kwargs)
 
         partial = functools.partial(self.callback, **kwargs)
         loop = asyncio.get_running_loop()
-        return loop.run_in_executor(None, partial)
+        return await loop.run_in_executor(None, partial)
+
+    async def _run_checks_pipeline(self, interaction: Interaction) -> ResponsePayload:
+        try:
+            for check in self._checks_pipeline:
+                interaction = await check(interaction)
+        except Exception as e:
+            return await self._on_error(interaction, e)
+        else:
+            return await self._invoke(interaction)
+
+    def error(
+        self,
+        func: Callable[[Interaction, Exception], Coroutine[Any, Any, ResponsePayload]],
+    ):
+        self._on_error = func
 
     @validate_arguments
     def button(
