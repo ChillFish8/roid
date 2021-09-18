@@ -70,6 +70,9 @@ class HttpHandler:
         self.__token = token
         self._primary_route = f"https://{DISCORD_DOMAIN}/api/{self.API_VERSION}/applications/{application_id}"
 
+    async def shutdown(self):
+        await self.client.aclose()
+
     async def register_command(self, guild_id: Optional[int], ctx: BaseModel):
         if guild_id is None:
             url = "/commands"

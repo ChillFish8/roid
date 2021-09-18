@@ -24,6 +24,14 @@ _log = logging.getLogger("roid-main")
 
 
 class SlashCommands(FastAPI):
+    """
+    A slash commands application.
+
+    This wraps the standard FastAPI class so this can in theory be used to create
+    a basic general web application around the bot as well. However, the `/` route
+    is reserved and docs are disabled.
+    """
+
     def __init__(
         self,
         application_id: int,
@@ -32,7 +40,38 @@ class SlashCommands(FastAPI):
         register_commands: bool = True,
         **extra,
     ):
-        super().__init__(**extra)
+        """
+        A slash commands application.
+
+        This wraps the standard FastAPI class so this can in theory be used to create
+        a basic general web application around the bot as well. However, the `/` route
+        is reserved and docs are disabled.
+
+        Args:
+            application_id:
+                The application id obtained from discord.
+                See (https://discord.com/developers/application) to get this.
+
+            application_public_key:
+                The public key for request verification.
+                See (https://discord.com/developers/application) to get this.
+
+            token:
+                The bot token, this can be found in the portal at
+                 https://discord.com/developers/applications/656598065532239892/bot.
+
+            register_commands:
+                An optional bool determining if the system automatically registers the
+                new commands.
+
+                Defaults to True.
+
+                WARNING: If this is True it will bulk overwrite the existing
+                application global commands and guild commands.
+
+        """
+
+        super().__init__(**extra, docs_url=None, redoc_url=None)
 
         self.register_commands = register_commands
         self._verify_key = VerifyKey(bytes.fromhex(application_public_key))
@@ -53,6 +92,8 @@ class SlashCommands(FastAPI):
         return self._application_id
 
     async def _startup(self):
+        """A startup lifetime task invoked by the ASGI server."""
+
         if not self.register_commands:
             return
 
@@ -63,10 +104,15 @@ class SlashCommands(FastAPI):
             if command.guild_ids is None:
                 continue
 
+            _log.info(
+                f"Registering command {command.name} for guilds: {command.guild_ids}"
+            )
             await command.register(self)
 
     async def _shutdown(self):
-        ...
+        """A shutdown lifetime task invoked by the ASGI server."""
+
+        await self._http.shutdown()
 
     async def reload_global_commands(self):
         """
