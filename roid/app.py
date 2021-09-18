@@ -86,15 +86,6 @@ class SlashCommands(FastAPI):
         self.__state_backend = state_backend
         self.__state: Optional[MultiManagedState] = None
 
-        # This is a hack but we need to override FastApi's state.
-        def state_get() -> MultiManagedState:
-            return self.__state
-
-        def state_set(_):
-            raise RuntimeError("state cannot be changed at runtime.")
-
-        self.state: MultiManagedState = property(fget=state_get, fset=state_set)  # noqa
-
         self.register_commands = register_commands
         self._verify_key = VerifyKey(bytes.fromhex(application_public_key))
         self._application_id = application_id
@@ -108,6 +99,16 @@ class SlashCommands(FastAPI):
         self.post("/", name="Interaction Events")(self.__root)
         self.on_event("startup")(self._startup)
         self.on_event("shutdown")(self._shutdown)
+
+    @property
+    def state(self) -> MultiManagedState:
+        return self.__state
+
+    @state.setter
+    def state(self, _):
+        if hasattr(self, "_ignored_child"):
+            raise RuntimeError("state cannot be set at runtime.")
+        self._ignored_child = True
 
     @property
     def application_id(self):
@@ -276,6 +277,7 @@ class SlashCommands(FastAPI):
 
         def wrapper(func):
             cmd = Command(
+                app=self,
                 callback=func,
                 name=name,
                 description=description,

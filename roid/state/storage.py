@@ -85,12 +85,12 @@ class SqliteBackend(StorageBackend):
     async def store(self, key: str, value: bytes):
         op = _SqliteOp("SET", {"key": key, "value": value})
         self._runner.submit(op)
-        return await op
+        return await op.wait()
 
     async def get(self, key: str) -> Optional[bytes]:  # noqa
         op = _SqliteOp("GET", {"key": key})
         self._runner.submit(op)
-        await op
+        return await op.wait()
 
 
 class _SqliteOp:
@@ -104,8 +104,8 @@ class _SqliteOp:
     def set_result(self, *args):
         self._loop.call_soon_threadsafe(self._resolve.set_result, *args)
 
-    def __await__(self):
-        self._resolve.__await__()
+    async def wait(self):
+        return await self._resolve
 
 
 class _SqliteRunner:
@@ -139,18 +139,18 @@ class _SqliteRunner:
             event: _SqliteOp = self._queue.get()
 
             if event.action == "SET":
-                self._set(**event.data)
+                self._set(db, **event.data)
                 event.set_result(None)
             elif event.action == "GET":
-                result = self._get(**event.data)
+                result = self._get(db, **event.data)
                 event.set_result(result)
             else:
                 raise Exception(f"Unknown action {event.action!r}")
 
     @staticmethod
-    def _set(db: sqlite3.Connection, key: str, data: Optional[bytes]):
+    def _set(db: sqlite3.Connection, key: str, value: Optional[bytes]):
         cur = db.cursor()
-        cur.execute("INSERT INTO store (key, store_value) VALUES (?, ?)", (key, data))
+        cur.execute("INSERT INTO store (key, store_value) VALUES (?, ?)", (key, value))
         cur.close()
 
     @staticmethod

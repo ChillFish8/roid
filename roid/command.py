@@ -418,10 +418,17 @@ class Command:
 
         state = self.app.state[COMMAND_STATE_TARGET]
 
+        # We got along and update each button with a unique id in order
+        # to pass the given context to each one.
         for row_i in range(len(response.data.components)):
             for component_i in range(len(response.data.components[row_i].components)):
                 target_id = str(uuid.uuid4())
                 await state.set(target_id, response.data.component_context)
+                component = response.data.components[row_i].components[component_i]
+
+                if component.url is not None:
+                    continue
+
                 response.data.components[row_i].components[
                     component_i
                 ].custom_id = target_id
