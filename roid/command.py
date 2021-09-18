@@ -33,13 +33,15 @@ class CommandContext(BaseModel):
     default_permission: bool
 
     def __eq__(self, other: "CommandContext"):
-        dict_self = self.dict()
-        dict_other = self.dict()
-
-        dict_self.pop("id", None)
-        dict_other.pop("id", None)
-
-        return dict_self == dict_other
+        return (
+            self.name == other.name
+            and self.description == other.description
+            and self.application_id == other.application_id
+            and self.guild_id == other.guild_id
+            and self.options == other.options
+            and self.choices == other.choices
+            and self.default_permission == other.default_permission
+        )
 
 
 class SetValue:

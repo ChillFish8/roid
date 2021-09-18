@@ -25,7 +25,9 @@ class TestAnimal(Enum):
 
 
 @require_user_permissions(MemberPermissions.ADMINISTRATOR)
-@app.command("say-hello", type=CommandType.USER, guild_id=675647130647658527)
+@app.command(
+    "say-hello", "oofies", type=CommandType.CHAT_INPUT, guild_id=675647130647658527
+)
 async def test(interaction: Interaction, message: User):
     pprint.pprint(interaction.dict())
 

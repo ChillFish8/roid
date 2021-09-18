@@ -209,7 +209,11 @@ class SlashCommands(FastAPI):
         defer_register: bool = False,
     ):
         if type in (CommandType.MESSAGE, CommandType.USER) and description is not None:
-            raise ValueError(f"only CHAT_INPUT types can have a set description")
+            raise ValueError(f"only CHAT_INPUT types can have a set description.")
+        elif type is CommandType.CHAT_INPUT and description is None:
+            raise ValueError(
+                f"missing required field 'description' for CHAT_INPUT commands."
+            )
 
         def wrapper(func):
             cmd = Command(
