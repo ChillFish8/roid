@@ -38,6 +38,9 @@ from roid.checks import CommandCheck
 from roid.response import ResponsePayload
 
 
+COMMAND_STATE_TARGET = "command-state"
+
+
 class CommandContext(BaseModel):
     id: Optional[str]
     type: CommandType
@@ -201,6 +204,7 @@ class PassTarget(IntEnum):
 class Command:
     def __init__(
         self,
+        app: SlashCommands,
         callback,
         name: str,
         application_id: int,
@@ -211,6 +215,7 @@ class Command:
         cmd_type: CommandType = CommandType.CHAT_INPUT,
         defer_register: bool = True,
     ):
+        self.app = app
         self.defer_register = defer_register
 
         spec = inspect.getfullargspec(callback)
@@ -405,8 +410,23 @@ class Command:
                 interaction = await check(interaction)
         except Exception as e:
             return await self._on_error(interaction, e)
-        else:
-            return await self._invoke(interaction)
+
+        response = await self._invoke(interaction)
+
+        if response.data.components is None:
+            return response
+
+        state = self.app.state[COMMAND_STATE_TARGET]
+
+        for row_i in range(len(response.data.components)):
+            for component_i in range(len(response.data.components[row_i].components)):
+                target_id = str(uuid.uuid4())
+                await state.set(target_id, response.data.component_context)
+                response.data.components[row_i].components[
+                    component_i
+                ].custom_id = target_id
+
+        return response
 
     def error(
         self,

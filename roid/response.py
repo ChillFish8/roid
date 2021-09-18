@@ -1,7 +1,7 @@
 from enum import IntEnum
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
-from pydantic import BaseModel, constr, validate_arguments
+from pydantic import BaseModel, constr, validate_arguments, validator
 
 from roid.components import Component, ActionRow
 from roid.objects import Embed, AllowedMentions
@@ -27,6 +27,22 @@ class ResponseData(BaseModel):
     flags: Optional[int]
     components: Optional[List[ActionRow]]
 
+    # Purely internal
+    component_context: Optional[dict]
+
+    def dict(
+        self,
+        *,
+        exclude: set = None,
+        **kwargs,
+    ) -> dict:
+        if exclude is None:
+            exclude = {"component_context"}
+        else:
+            exclude.add("component_context")
+
+        return super().dict(exclude=exclude, **kwargs)
+
 
 class ResponsePayload(BaseModel):
     type: ResponseType
@@ -43,6 +59,7 @@ def response(
     flags: int = None,
     tts: bool = False,
     components: Optional[List[List[Component]]] = None,
+    component_context: Optional[Dict[str, Any]] = None,
 ) -> ResponsePayload:
     """
     A response to the given interaction.
@@ -71,6 +88,16 @@ def response(
 
         components:
             A optional list of components to attach to the response.
+
+        component_context:
+            Any given state to be passed to the components on invocation.
+            If you need to provide data to the component you *MUST* use this
+            rather than a global variable as this guarantees synchronisation across
+            processes.
+
+            If you're only running 1 process (not advised for scaling) then you can
+            ignore the above warning however, you will need to to change the code
+            base if you later plan to use multi processing.
 
     Returns:
         A `ResponsePayload` object.
@@ -102,6 +129,7 @@ def response(
         embeds=embeds if embeds else None,
         content=content,
         components=components and action_rows,
+        component_context=component_context,
     )
 
     return ResponsePayload(type=ResponseType.CHANNEL_MESSAGE_WITH_SOURCE, data=data)

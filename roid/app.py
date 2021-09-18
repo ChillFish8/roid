@@ -86,6 +86,15 @@ class SlashCommands(FastAPI):
         self.__state_backend = state_backend
         self.__state: Optional[MultiManagedState] = None
 
+        # This is a hack but we need to override FastApi's state.
+        def state_get() -> MultiManagedState:
+            return self.__state
+
+        def state_set(_):
+            raise RuntimeError("state cannot be changed at runtime.")
+
+        self.state: MultiManagedState = property(fget=state_get, fset=state_set)  # noqa
+
         self.register_commands = register_commands
         self._verify_key = VerifyKey(bytes.fromhex(application_public_key))
         self._application_id = application_id
@@ -103,14 +112,6 @@ class SlashCommands(FastAPI):
     @property
     def application_id(self):
         return self._application_id
-
-    @property
-    def state(self) -> MultiManagedState:
-        return self.__state
-
-    @state.setter
-    def state(self, _):
-        raise RuntimeError("state cannot be changed at runtime")
 
     async def _startup(self):
         """A startup lifetime task invoked by the ASGI server."""
