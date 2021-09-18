@@ -226,6 +226,22 @@ class SlashCommands(FastAPI):
         elif interaction.type == InteractionType.MESSAGE_COMPONENT:
             if interaction.data.custom_id is None:
                 return HTTPException(status_code=400)
+
+            custom_id, *reference_id = interaction.data.custom_id.split(":", maxsplit=1)
+            reference_id = reference_id or None
+
+            component = self._components.get(custom_id)
+            if component is None:
+                return HTTPException(status_code=400, detail="No component found")
+
+            try:
+                return await component(interaction, reference_id)
+            except Exception as e:
+                handler = self._global_error_handlers.get(type(e))
+                if handler is not None:
+                    return handler(e)
+                raise e from None
+
         raise HTTPException(status_code=400)
 
     @validate_arguments

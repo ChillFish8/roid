@@ -7,6 +7,7 @@ from typing import Optional, Union, List, Callable, Any, Coroutine, TYPE_CHECKIN
 from pydantic import BaseModel, conint, AnyHttpUrl, constr
 
 from roid.objects import PartialEmoji
+from roid.state import COMMAND_STATE_TARGET
 
 if TYPE_CHECKING:
     from roid.app import SlashCommands
@@ -107,5 +108,8 @@ class Component:
     def __hash__(self):
         return hash(self._ctx.custom_id)
 
-    async def __call__(self, interaction: Interaction):
+    async def __call__(self, interaction: Interaction, reference_id: Optional[str]):
+        ctx = await self.app.state[COMMAND_STATE_TARGET].get(reference_id)
+
+        # todo
         print(json.dumps(interaction.dict(), indent=4))

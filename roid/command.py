@@ -36,9 +36,7 @@ from roid.objects import Role, Channel, Member, PartialMessage, User
 from roid.extractors import extract_options
 from roid.checks import CommandCheck
 from roid.response import ResponsePayload
-
-
-COMMAND_STATE_TARGET = "command-state"
+from roid.state import COMMAND_STATE_TARGET
 
 
 class CommandContext(BaseModel):
@@ -422,8 +420,8 @@ class Command:
         # to pass the given context to each one.
         for row_i in range(len(response.data.components)):
             for component_i in range(len(response.data.components[row_i].components)):
-                target_id = str(uuid.uuid4())
-                await state.set(target_id, response.data.component_context)
+                reference_id = str(uuid.uuid4())
+                await state.set(reference_id, response.data.component_context)
                 component = response.data.components[row_i].components[component_i]
 
                 if component.url is not None:
@@ -431,7 +429,7 @@ class Command:
 
                 response.data.components[row_i].components[
                     component_i
-                ].custom_id = f"{component.custom_id}:{target_id}"
+                ].custom_id = f"{component.custom_id}:{reference_id}"
 
         return response
 
