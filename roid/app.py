@@ -19,7 +19,7 @@ from roid.interactions import InteractionType, Interaction
 from roid.error_handlers import KNOWN_ERRORS
 from roid.response import ResponsePayload
 from roid.http import HttpHandler
-from roid.state import ManagedState
+from roid.state import StorageBackend, MultiManagedState, SqliteBackend
 
 _log = logging.getLogger("roid-main")
 
@@ -39,7 +39,7 @@ class SlashCommands(FastAPI):
         application_public_key: str,
         token: str,
         register_commands: bool = True,
-        state: Optional[ManagedState] = None,
+        state_backend: Optional[StorageBackend] = None,
         **extra,
     ):
         """
@@ -71,12 +71,20 @@ class SlashCommands(FastAPI):
                 WARNING: If this is True it will bulk overwrite the existing
                 application global commands and guild commands.
 
-            state:
-                The given managed state handler, this is used for sharing context
-                between components and `app.state`.
+            state_backend:
+                The given storage backend to use for internal state management
+                and `SlashCommands.state` calls.
+
+                If no backend is given the Sqlite backend is used.
         """
 
         super().__init__(**extra, docs_url=None, redoc_url=None)
+
+        if state_backend is None:
+            state_backend = SqliteBackend(f"__internal_managed_state")
+
+        self.__state_backend = state_backend
+        self.__state: Optional[MultiManagedState] = None
 
         self.register_commands = register_commands
         self._verify_key = VerifyKey(bytes.fromhex(application_public_key))
@@ -96,8 +104,19 @@ class SlashCommands(FastAPI):
     def application_id(self):
         return self._application_id
 
+    @property
+    def state(self) -> MultiManagedState:
+        return self.__state
+
+    @state.setter
+    def state(self, _):
+        raise RuntimeError("state cannot be changed at runtime")
+
     async def _startup(self):
         """A startup lifetime task invoked by the ASGI server."""
+
+        self.__state = MultiManagedState(backend=self.__state_backend)
+        await self.__state.startup()
 
         if not self.register_commands:
             return
@@ -117,7 +136,10 @@ class SlashCommands(FastAPI):
     async def _shutdown(self):
         """A shutdown lifetime task invoked by the ASGI server."""
 
-        await self._http.shutdown()
+        try:
+            await self._http.shutdown()
+        finally:
+            await self.__state.shutdown()
 
     async def reload_global_commands(self):
         """

@@ -1,4 +1,3 @@
-import pprint
 import os
 from enum import Enum
 import uvicorn
@@ -6,7 +5,7 @@ import logging
 
 from roid import SlashCommands, response, Embed, CommandType, Interaction
 from roid.components import ButtonStyle
-from roid.objects import MemberPermissions, User
+from roid.objects import MemberPermissions
 from roid.helpers import require_user_permissions, hyperlink
 from roid import components
 

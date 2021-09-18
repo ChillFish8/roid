@@ -110,12 +110,10 @@ class _SqliteOp:
 
 class _SqliteRunner:
     def __init__(self, db_name: str):
-        db = sqlite3.connect(f"file:{db_name}?mode=memory&cache=shared")
-
         self._queue = queue.Queue()
         self._running = True
 
-        self._thread = threading.Thread(target=self._runner, args=(db,))
+        self._thread = threading.Thread(target=self._runner, args=(db_name,))
         self._thread.start()
 
     def submit(self, op: _SqliteOp):
@@ -125,10 +123,12 @@ class _SqliteRunner:
         self._running = False
         self._thread.join()
 
-    def _runner(self, db: sqlite3.Connection):
+    def _runner(self, db_name: str):
+        db = sqlite3.connect(f"file:{db_name}?mode=memory&cache=shared")
+
         db.execute(
             """
-            CREATE TABLE store (
+            CREATE TABLE IF NOT EXISTS store (
                 key TEXT PRIMARY KEY,
                 store_value BLOB
             )           
