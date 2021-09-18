@@ -1,23 +1,25 @@
-import time
-
-import httpx
 import orjson
 import logging
+
+try:
+    import orjson as json
+except ImportError:
+    import json
 
 from nacl.signing import VerifyKey
 from nacl.exceptions import BadSignatureError
 
-from typing import Dict, Type, Callable, Coroutine, Any, Union, List
+from typing import Dict, Type, Callable
 from fastapi import FastAPI, Request
 from fastapi.exceptions import HTTPException
 from pydantic import ValidationError, validate_arguments
 
 from roid.command import CommandType, Command, CommandContext
-from roid import exceptions
 from roid.interactions import InteractionType, Interaction
 from roid.config import API_URL
 from roid.error_handlers import KNOWN_ERRORS
 from roid.response import ResponsePayload
+from roid.http import HttpHandler
 
 COMMANDS_ADD = f"{API_URL}/applications/{{application_id}}/commands"
 GUILD_COMMANDS_ADD = (
@@ -42,6 +44,7 @@ class SlashCommands(FastAPI):
         self._global_error_handlers = KNOWN_ERRORS
 
         self._commands: Dict[str, Command] = {}
+        self._http = HttpHandler(application_id, token)
 
         self.post("/", name="Interaction Events")(self._root)
 
@@ -115,52 +118,6 @@ class SlashCommands(FastAPI):
             ...
         raise HTTPException(status_code=400)
 
-    def _request(
-        self, method: str, path: str, headers: dict = None, **extra
-    ) -> httpx.Response:
-        set_headers = {
-            "Authorization": f"Bot {self._token}",
-        }
-
-        if headers is not None:
-            set_headers = {
-                **set_headers,
-                **headers,
-            }
-
-        url = f"{API_URL}/applications/{self.application_id}{path}"
-        r = httpx.request(
-            method,
-            url,
-            headers=set_headers,
-            **extra,
-        )
-        time.sleep(0.5)
-
-        try:
-            r.raise_for_status()
-        except httpx.HTTPStatusError:
-            if r.status_code == 404:
-                raise exceptions.HTTPException(
-                    status=r.status_code,
-                    body=f"Not Found: No route for url: {url!r}",
-                )
-
-            if r.status_code != 400:
-                raise exceptions.HTTPException(status=r.status_code, body=r.text)
-
-            data = r.json()
-            errors = data["errors"]
-
-            sections = []
-            for location, detail in errors.items():
-                message_details = ", ".join(
-                    [item["message"] for item in detail["_errors"]]
-                )
-                sections.append(f"Error @ {location}: {message_details}")
-            raise exceptions.HTTPException(status=400, body="\n".join(sections))
-        return r
-
     def remove_old_global_commands(self, registered: Dict[str, CommandContext]):
         for cmd in registered.values():
             if cmd.name in self._commands:
@@ -177,25 +134,10 @@ class SlashCommands(FastAPI):
         self.remove_old_global_commands(registered)
 
         for command in self._commands.values():
-            if (not command.register) or (command.ctx in registered.values()):
+            if not command.defer_register:
                 continue
 
-            if command.ctx.name in registered:
-                logger.info(f"updating command: {command.ctx!r}")
-            else:
-                logger.info(f"submitting command: {command.ctx!r}")
-
-            if command.ctx.guild_id is None:
-                url = f"/commands"
-            else:
-                url = f"/guilds/{command.ctx.guild_id}/commands"
-
-            self._request(
-                "POST",
-                url,
-                headers={"Content-Type": "application/json"},
-                data=command.ctx.json(),
-            )
+            command.register()
 
     @validate_arguments
     def command(
@@ -208,6 +150,42 @@ class SlashCommands(FastAPI):
         default_permissions: bool = True,
         defer_register: bool = False,
     ):
+        """
+        Registers a command with the given app.
+
+        If the command type is either `CommandType.MESSAGE` or `CommandType.USER`
+        there cannot be any description however, if the command type
+        is `CommandType.CHAT_INPUT` then description is required.
+        If either of those conditions are broken a `ValueError` is raised.
+
+        Args:
+            name:
+                The name of the command. This must be unique / follow the general
+                slash command rules as described in the "Application Command Structure"
+                section of the interactions documentation.
+
+            description:
+                The description of the command. This can only be applied to
+                `CommandType.CHAT_INPUT` commands.
+
+            type:
+                The type of command. This determines if it's a chat input command,
+                user context menu command or message context menu command.
+
+                defaults to `CommandType.CHAT_INPUT`
+
+            guild_id:
+                The optional guild id if this is a guild specific command.
+
+            default_permissions:
+                Whether the command is enabled by default when the app is added to a guild.
+
+            defer_register:
+                Whether or not to automatically register the command / update the command
+                if needed.
+
+                If set to `False` this will not be automatically registered / updated.
+        """
         if type in (CommandType.MESSAGE, CommandType.USER) and description is not None:
             raise ValueError(f"only CHAT_INPUT types can have a set description.")
         elif type is CommandType.CHAT_INPUT and description is None:
@@ -224,7 +202,7 @@ class SlashCommands(FastAPI):
                 cmd_type=type,
                 guild_id=guild_id,
                 default_permissions=default_permissions,
-                register=not defer_register,
+                defer_register=not defer_register,
             )
 
             self._commands[name] = cmd

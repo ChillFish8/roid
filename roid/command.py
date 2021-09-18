@@ -1,11 +1,26 @@
+from __future__ import annotations
+
 import asyncio
 import functools
 import inspect
 import typing
 
 from enum import Enum, IntEnum, auto
-from typing import List, Union, Optional, Any, Tuple, Dict, Callable, Coroutine
+from typing import (
+    List,
+    Union,
+    Optional,
+    Any,
+    Tuple,
+    Dict,
+    Callable,
+    Coroutine,
+    TYPE_CHECKING,
+)
 from pydantic import BaseModel, constr, validate_arguments
+
+if TYPE_CHECKING:
+    from roid.app import SlashCommands
 
 from roid.exceptions import InvalidCommandOptionType
 from roid.interactions import (
@@ -188,15 +203,13 @@ class Command:
         description: Optional[str] = None,
         default_permissions: bool = False,
         guild_id: Optional[int] = None,
+        guild_ids: Optional[List[int]] = None,
         cmd_type: CommandType = CommandType.CHAT_INPUT,
-        register: bool = True,
+        defer_register: bool = True,
     ):
-        self.register = register
-        self._is_coroutine = asyncio.iscoroutinefunction(callback)
-        self._callback = callback
+        self.defer_register = defer_register
 
-        spec = inspect.getfullargspec(self._callback)
-        annotations = spec.annotations
+        spec = inspect.getfullargspec(callback)
 
         # Sets up how we should handle special case type hints.
         # The pass_target is only valid for MESSAGE and USER commands,
@@ -206,7 +219,7 @@ class Command:
         # so we also remove them from the annotations.
         self._pass_target: Tuple[PassTarget, str] = (PassTarget.NONE, "_")
         self._pass_interaction: Optional[str] = None
-        for param, type_ in annotations.copy().items():
+        for param, type_ in spec.annotations.copy().items():
             if type_ is Interaction:
                 del spec.annotations[param]
                 self._pass_interaction = param
@@ -237,19 +250,31 @@ class Command:
             if option.choices is None:
                 continue
 
-        self.ctx = CommandContext(
-            name=name,
-            description=description,
-            application_id=str(application_id),
-            type=cmd_type,
-            guild_id=str(guild_id),
-            default_permission=default_permissions,
-            options=options if len(options) != 0 else None,
-        )
+        # Our relevant command context
+        self.name = name
+        self.description = description
+        self.application_id = str(application_id)
+        self.type = cmd_type
 
-        self._callback = validate_arguments(self._callback)
+        if guild_id is not None and guild_ids is None:
+            self.guild_ids = {
+                guild_id,
+            }
+        elif guild_id is None and guild_ids is not None:
+            self.guild_ids = set(guild_ids)
+        else:
+            self.guild_ids = set()
+
+        self.default_permission = default_permissions
+        self.options = options if len(options) != 0 else None
+
+        self._callback_is_coroutine = asyncio.iscoroutinefunction(callback)
+        self._callback = validate_arguments(callback)
         self._checks_pipeline: List[CommandCheck] = []
         self._on_error = default_on_error
+
+    async def register(self, app: SlashCommands):
+        ...
 
     def _get_option_data(self, interaction: Interaction) -> dict:
         if interaction.data.options is None:
@@ -298,7 +323,7 @@ class Command:
         passed directly.
         """
 
-        cmd_type = self.ctx.type
+        cmd_type = self.type
         pass_target, pass_name = self._pass_target
         if cmd_type == CommandType.CHAT_INPUT:
             return self._get_option_data(interaction)
@@ -327,7 +352,7 @@ class Command:
         if self._pass_interaction is not None:
             kwargs[self._pass_interaction] = interaction
 
-        if self._is_coroutine:
+        if self._callback_is_coroutine:
             return await self._callback(**kwargs)
 
         partial = functools.partial(self._callback, **kwargs)
