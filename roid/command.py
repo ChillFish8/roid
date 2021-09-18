@@ -431,7 +431,7 @@ class Command:
 
                 response.data.components[row_i].components[
                     component_i
-                ].custom_id = target_id
+                ].custom_id = f"{component.custom_id}:{target_id}"
 
         return response
 

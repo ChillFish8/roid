@@ -49,5 +49,20 @@ class CommandRejected(HTTPException):
         return f"status={self.status}, message={self.body}"
 
 
+class InvalidComponent(RoidException):
+    """A component is invalid for some reason."""
+
+
+class ComponentAlreadyExists(InvalidComponent):
+    """The component with the given unique_id already exists."""
+
+
 class InvalidCommand(RoidException):
     """The command is invalid for some reason."""
+
+
+class CommandAlreadyExists(InvalidCommand):
+    """
+    A command with the given unique name already exists
+    either as a guild specific command or as a global.
+    """

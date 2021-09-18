@@ -75,9 +75,9 @@ OptionData.update_forward_refs()
 
 
 class InteractionData(BaseModel):
-    id: int
-    name: str
-    type: CommandType
+    id: Optional[int]
+    name: Optional[str]
+    type: Optional[CommandType]
     resolved: Optional[ResolvedData]
     options: Optional[List[OptionData]]
     custom_id: Optional[str]

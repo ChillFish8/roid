@@ -1,5 +1,10 @@
-import orjson
+import re
 import logging
+import uuid
+
+from roid.components import Component, ComponentType, ButtonStyle, EMOJI_REGEX
+from roid.exceptions import CommandAlreadyExists, ComponentAlreadyExists
+from roid.objects import PartialEmoji
 
 try:
     import orjson as json
@@ -9,10 +14,10 @@ except ImportError:
 from nacl.signing import VerifyKey
 from nacl.exceptions import BadSignatureError
 
-from typing import Dict, Type, Callable, Optional
+from typing import Dict, Type, Callable, Optional, List
 from fastapi import FastAPI, Request
 from fastapi.exceptions import HTTPException
-from pydantic import ValidationError, validate_arguments
+from pydantic import ValidationError, validate_arguments, constr, conint
 
 from roid.command import CommandType, Command
 from roid.interactions import InteractionType, Interaction
@@ -93,6 +98,7 @@ class SlashCommands(FastAPI):
         self._global_error_handlers = KNOWN_ERRORS
 
         self._commands: Dict[str, Command] = {}
+        self._components: Dict[str, Component] = {}
         self._http = HttpHandler(application_id, token)
 
         # register the internal route and FastAPI internals.
@@ -193,7 +199,7 @@ class SlashCommands(FastAPI):
         except (BadSignatureError, KeyError):
             raise HTTPException(status_code=401)
 
-        data = orjson.loads(body)
+        data = json.loads(body)
         logging.debug(f"got payload: {data}")
 
         try:
@@ -218,7 +224,8 @@ class SlashCommands(FastAPI):
                 raise e from None
 
         elif interaction.type == InteractionType.MESSAGE_COMPONENT:
-            ...
+            if interaction.data.custom_id is None:
+                return HTTPException(status_code=400)
         raise HTTPException(status_code=400)
 
     @validate_arguments
@@ -229,6 +236,7 @@ class SlashCommands(FastAPI):
         *,
         type: CommandType = CommandType.CHAT_INPUT,  # noqa
         guild_id: int = None,
+        guild_ids: List[int] = None,
         default_permissions: bool = True,
         defer_register: bool = False,
     ):
@@ -259,6 +267,9 @@ class SlashCommands(FastAPI):
             guild_id:
                 The optional guild id if this is a guild specific command.
 
+            guild_ids:
+                An optional list of id's to register this command with multiple guilds.
+
             default_permissions:
                 Whether the command is enabled by default when the app is added to a guild.
 
@@ -284,12 +295,152 @@ class SlashCommands(FastAPI):
                 application_id=self.application_id,
                 cmd_type=type,
                 guild_id=guild_id,
+                guild_ids=guild_ids,
                 default_permissions=default_permissions,
                 defer_register=not defer_register,
             )
 
+            if name in self._commands:
+                raise CommandAlreadyExists(
+                    f"command with name {name!r} has already been defined and registered"
+                )
             self._commands[name] = cmd
 
             return cmd
+
+        return wrapper
+
+    @validate_arguments
+    def button(
+        self,
+        label: str,
+        style: ButtonStyle,
+        *,
+        custom_id: Optional[
+            constr(strip_whitespace=True, regex="a-zA-Z0-9", min_length=1)
+        ] = None,
+        disabled: bool = False,
+        emoji: constr(strip_whitespace=True, regex=EMOJI_REGEX) = None,
+        url: Optional[str] = None,
+    ):
+        """
+        Attaches a button component to the given command.
+
+        Args:
+            style:
+                The set button style. This can be any set style however url styles
+                require the url kwarg and generally would be better off using
+                the hyperlink helper decorator.
+
+            custom_id:
+                The custom button identifier. If you plan on having long running
+                persistent buttons that dont require context from their parent command;
+                e.g. reaction roles. You probably want to set this.
+
+            disabled:
+                If the button should start disabled or not.
+
+            label:
+                The button label / text shown on the button.
+
+            emoji:
+                The set emoji for the button. This should be a custom emoji
+                not a unicode emoji (use the `label` field for that.)
+
+            url:
+                The hyperlink url, if this is set the function body is not invoked
+                on click along with the `emoji` and `style` field being ignored.
+        """
+
+        if emoji is not None:
+            emoji = re.findall(EMOJI_REGEX, emoji)[0]
+            animated, name, id_ = emoji
+            emoji = PartialEmoji(id=id_, name=name, animated=bool(animated))
+
+        if custom_id is None:
+            custom_id = str(uuid.uuid4())
+
+        def wrapper(func):
+            component = Component(
+                app=self,
+                callback=func,
+                type_=ComponentType.BUTTON,
+                style=style,
+                custom_id=custom_id,
+                disabled=disabled,
+                label=label,
+                emoji=emoji,
+                url=url,
+            )
+
+            if custom_id in self._components:
+                raise ComponentAlreadyExists(
+                    f"component with custom_id {custom_id!r} has already been defined and registered"
+                )
+            self._components[custom_id] = component
+
+            return component
+
+        return wrapper
+
+    @validate_arguments
+    def select(
+        self,
+        *,
+        custom_id: Optional[
+            constr(strip_whitespace=True, regex="a-zA-Z0-9", min_length=1)
+        ] = None,
+        disabled: bool = False,
+        placeholder: str = "Select an option.",
+        min_values: conint(ge=0, le=25) = 1,
+        max_values: conint(ge=0, le=25) = 1,
+    ):
+        """
+        A select menu component.
+
+        This will occupy and entire action row so any components sharing the row
+        will be rejected (done on a first come first served basis.)
+
+        Args:
+            custom_id:
+                The custom button identifier. If you plan on having long running
+                persistent buttons that dont require context from their parent command;
+                e.g. reaction roles. You probably want to set this.
+
+            disabled:
+                If the button should start disabled or not.
+
+            placeholder:
+                The placeholder text the user sees while the menu is not focused.
+
+            min_values:
+                The minimum number of values the user must select.
+
+            max_values:
+                The maximum number of values the user can select.
+        """
+
+        if custom_id is None:
+            custom_id = str(uuid.uuid4())
+
+        def wrapper(func):
+            component = Component(
+                app=self,
+                callback=func,
+                type_=ComponentType.SELECT_MENU,
+                custom_id=custom_id,
+                disabled=disabled,
+                placeholder=placeholder,
+                min_values=min_values,
+                max_values=max_values,
+            )
+
+            if custom_id in self._components:
+                raise ComponentAlreadyExists(
+                    f"component with custom_id {custom_id!r} has already been defined and registered"
+                )
+            self._components[custom_id] = component
+
+            return component
 
         return wrapper

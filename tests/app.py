@@ -44,7 +44,7 @@ async def test(interaction: Interaction):
     return resp
 
 
-@components.button(
+@app.button(
     style=ButtonStyle.PRIMARY,
     label="Click me",
     emoji="<:CrunchyRollLogo:676087821596885013>",
