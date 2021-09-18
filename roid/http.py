@@ -1,10 +1,10 @@
+from __future__ import annotations
+
+import httpx
 import asyncio
 import sys
 import logging
-from typing import Optional, List
-
-import httpx
-
+from typing import Optional, List, TYPE_CHECKING
 from datetime import datetime
 
 from pydantic import BaseModel
@@ -13,6 +13,9 @@ try:
     import orjson as json
 except ImportError:
     import json
+
+if TYPE_CHECKING:
+    from roid.command import Command
 
 from roid import __version__
 from roid.exceptions import HTTPException, DiscordServerError, Forbidden, NotFound
@@ -80,6 +83,14 @@ class HttpHandler:
             url,
             headers={"Content-Type": "application/json"},
             data=ctx.json(),
+        )
+
+    async def register_commands(self, commands: List[Command]):
+        await self.request(
+            "PUT",
+            "/commands",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps([c.ctx for c in commands]),
         )
 
     async def get_global_commands(self) -> List[dict]:

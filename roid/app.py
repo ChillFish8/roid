@@ -29,15 +29,21 @@ GUILD_COMMANDS_ADD = (
 GET_GLOBAL_COMMANDS = f"{API_URL}/applications/{{application_id}}/commands"
 REMOVE_GLOBAL_COMMAND = f"{API_URL}/applications/{{application_id}}"
 
-logger = logging.getLogger("roid-main")
+_log = logging.getLogger("roid-main")
 
 
 class SlashCommands(FastAPI):
     def __init__(
-        self, application_id: int, application_public_key: str, token: str, **extra
+        self,
+        application_id: int,
+        application_public_key: str,
+        token: str,
+        register_commands: bool = True,
+        **extra,
     ):
         super().__init__(**extra)
 
+        self.register_commands = register_commands
         self._verify_key = VerifyKey(bytes.fromhex(application_public_key))
         self._application_id = application_id
         self._token = token
@@ -46,11 +52,38 @@ class SlashCommands(FastAPI):
         self._commands: Dict[str, Command] = {}
         self._http = HttpHandler(application_id, token)
 
-        self.post("/", name="Interaction Events")(self._root)
+        # register the internal route and FastAPI internals.
+        self.post("/", name="Interaction Events")(self.__root)
+        self.on_event("startup")(self._startup)
 
     @property
     def application_id(self):
         return self._application_id
+
+    async def _startup(self):
+        if not self.register_commands:
+            return
+
+        # We can set the globals in bulk.
+        await self.reload_global_commands()
+
+        for command in self._commands.values():
+            if command.guild_ids is None:
+                continue
+
+            await command.register(self)
+
+    async def reload_global_commands(self):
+        """
+        Registers all global commands in bulk with Discord.
+
+        Note: This will ignore any commands with a `guild_id` or `guild_ids` specified.
+        """
+
+        _log.debug("registering global commands with discord")
+        await self._http.register_commands(
+            [c for c in self._commands.values() if c.guild_ids is None]
+        )
 
     def register_error(
         self,
@@ -77,7 +110,7 @@ class SlashCommands(FastAPI):
 
         self._global_error_handlers[error] = callback
 
-    async def _root(self, request: Request):
+    async def __root(self, request: Request):
         try:
             signature = request.headers["X-Signature-Ed25519"]
             timestamp = request.headers["X-Signature-Timestamp"]
@@ -96,7 +129,7 @@ class SlashCommands(FastAPI):
         try:
             interaction = Interaction(**data)
         except ValidationError as e:
-            logger.warning(f"rejecting response due to {e!r}")
+            _log.warning(f"rejecting response due to {e!r}")
             return HTTPException(status_code=422, detail=e.errors())
 
         if interaction.type == InteractionType.PING:
@@ -117,27 +150,6 @@ class SlashCommands(FastAPI):
         elif interaction.type == InteractionType.MESSAGE_COMPONENT:
             ...
         raise HTTPException(status_code=400)
-
-    def remove_old_global_commands(self, registered: Dict[str, CommandContext]):
-        for cmd in registered.values():
-            if cmd.name in self._commands:
-                continue
-
-            _ = self._request("DELETE", f"/commands/{cmd.id}")
-
-    async def get_global_commands(self) -> Dict[str, CommandContext]:
-        data = await self._http.get_global_commands()
-        return {data["name"]: CommandContext(**data) for data in data}
-
-    async def submit_commands(self):
-        registered = await self.get_global_commands()
-        self.remove_old_global_commands(registered)
-
-        for command in self._commands.values():
-            if not command.defer_register:
-                continue
-
-            await command.register(self)
 
     @validate_arguments
     def command(

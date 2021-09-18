@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 import asyncio
 import functools
 import inspect
@@ -146,6 +147,7 @@ def get_details_from_spec(
                 choice_blocks.append(CommandChoice(name=str(e.value), value=e.value))
             type_ = target_type
 
+        # See if its a type we recognise for conversion otherwise reject it.
         result = OPTION_TYPE_PROCESSOR.get(type_)
         if result is None:
             raise InvalidCommand(
@@ -275,19 +277,47 @@ class Command:
         self._checks_pipeline: List[CommandCheck] = []
         self._on_error = default_on_error
 
+    def __call__(self, interaction: Interaction):
+        return self._run_checks_pipeline(interaction)
+
     async def register(self, app: SlashCommands):
+        """
+        Register the command with the given app.
+
+        If any guild ids are given these are registered as specific
+        guild commands rather than as a global command.
+
+        Args:
+            app:
+                The slash commands app which the commands
+                should be registered to.
+        """
+
+        ctx = self.ctx
         if self.guild_ids is None:
-            await app._http.register_command(
-                None,
-                CommandContext(
-                    application_id=self.application_id,
-                    type=self.type,
-                    name=self.name,
-                    description=self.description,
-                    default_permission=self.default_permission,
-                    options=self.options if len(self.options) != 0 else None,
-                ),
-            )
+            await app._http.register_command(None, ctx)
+            return
+
+        for guild_id in self.guild_ids:
+            ctx.guild_id = guild_id
+            await app._http.register_command(guild_id, ctx)
+
+    @property
+    def ctx(self) -> CommandContext:
+        """
+        Gets the general command context data.
+
+        This is naive of any guild ids registered for this command.
+        """
+
+        return CommandContext(
+            application_id=self.application_id,
+            type=self.type,
+            name=self.name,
+            description=self.description,
+            default_permission=self.default_permission,
+            options=self.options if len(self.options) != 0 else None,
+        )
 
     def _get_option_data(self, interaction: Interaction) -> dict:
         if interaction.data.options is None:
@@ -300,9 +330,6 @@ class Command:
                 options[name] = default
 
         return options
-
-    def __call__(self, interaction: Interaction):
-        return self._run_checks_pipeline(interaction)
 
     def add_check(self, check: CommandCheck, *, at: int = -1):
         """
