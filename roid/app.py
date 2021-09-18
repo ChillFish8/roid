@@ -9,7 +9,7 @@ except ImportError:
 from nacl.signing import VerifyKey
 from nacl.exceptions import BadSignatureError
 
-from typing import Dict, Type, Callable
+from typing import Dict, Type, Callable, Optional
 from fastapi import FastAPI, Request
 from fastapi.exceptions import HTTPException
 from pydantic import ValidationError, validate_arguments
@@ -19,6 +19,7 @@ from roid.interactions import InteractionType, Interaction
 from roid.error_handlers import KNOWN_ERRORS
 from roid.response import ResponsePayload
 from roid.http import HttpHandler
+from roid.state import ManagedState
 
 _log = logging.getLogger("roid-main")
 
@@ -38,6 +39,7 @@ class SlashCommands(FastAPI):
         application_public_key: str,
         token: str,
         register_commands: bool = True,
+        state: Optional[ManagedState] = None,
         **extra,
     ):
         """
@@ -69,6 +71,9 @@ class SlashCommands(FastAPI):
                 WARNING: If this is True it will bulk overwrite the existing
                 application global commands and guild commands.
 
+            state:
+                The given managed state handler, this is used for sharing context
+                between components and `app.state`.
         """
 
         super().__init__(**extra, docs_url=None, redoc_url=None)

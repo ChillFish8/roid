@@ -28,6 +28,25 @@ class StorageBackend:
 
         raise NotImplemented()
 
+    async def startup(self):
+        """
+        A applicable startup task that gets called just before the server
+        starts accepting connections.
+
+        The backend should do any needed startup procedures in this task e.g. connect.
+        """
+
+        ...
+
+    async def shutdown(self):
+        """
+        A applicable shutdown task that gets called just before the server closes.
+
+        The backend should do any needed shutdown procedures in this task.
+        """
+
+        ...
+
 
 class RedisBackend(StorageBackend):
     def __init__(
@@ -52,13 +71,16 @@ class RedisBackend(StorageBackend):
     async def get(self, key: str) -> Optional[bytes]:  # noqa
         await self._redis.get(key)
 
+    async def shutdown(self):
+        await self._redis.close()
+
 
 class SqliteBackend(StorageBackend):
     def __init__(self, db_name: str = "managed-state"):
         self._runner = _SqliteRunner(db_name)
 
-    def shutdown(self):
-        self._runner.shutdown()    # noqa
+    async def shutdown(self):
+        self._runner.shutdown()  # noqa
 
     async def store(self, key: str, value: bytes):
         op = _SqliteOp("SET", {"key": key, "value": value})
@@ -104,12 +126,14 @@ class _SqliteRunner:
         self._thread.join()
 
     def _runner(self, db: sqlite3.Connection):
-        db.execute("""
+        db.execute(
+            """
             CREATE TABLE store (
                 key TEXT PRIMARY KEY,
                 store_value BLOB
             )           
-        """)
+        """
+        )
 
         while self._running:
             event: _SqliteOp = self._queue.get()
@@ -132,7 +156,9 @@ class _SqliteRunner:
     @staticmethod
     def _get(db: sqlite3.Connection, key: str) -> Optional[bytes]:
         cur = db.cursor()
-        cur.execute("SELECT (key, store_value) FROM store WHERE key = ? LIMIT 1", (key,))
+        cur.execute(
+            "SELECT (key, store_value) FROM store WHERE key = ? LIMIT 1", (key,)
+        )
         v = cur.fetchone()
         cur.close()
         return v
