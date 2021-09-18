@@ -1,7 +1,6 @@
-from typing import Any
-
 import httpx
-import httpcore
+
+from typing import Any
 
 
 class RoidException(Exception):
@@ -20,6 +19,7 @@ class HTTPException(RoidException):
 
     @property
     def status_code(self) -> int:
+        """The HTTP status code of the request"""
         return self.response.status_code
 
 
@@ -34,13 +34,6 @@ class NotFound(HTTPException):
 class DiscordServerError(HTTPException):
     """An error occurred on discord's side."""
 
-    def __str__(self):
-        return f"status={self.status_code}, message={self.data}"
-
-    @property
-    def status_code(self) -> int:
-        return self.response.status_code
-
 
 class CommandRejected(HTTPException):
     """Raised when an invalid command is set to be registed."""
@@ -53,5 +46,5 @@ class CommandRejected(HTTPException):
         return f"status={self.status}, message={self.body}"
 
 
-class InvalidCommandOptionType(RoidException):
-    """The given option has being hinted as being a invalid type."""
+class InvalidCommand(RoidException):
+    """The command is invalid for some reason."""

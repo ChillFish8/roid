@@ -15,6 +15,7 @@ from typing import (
     Dict,
     Callable,
     Coroutine,
+    Set,
     TYPE_CHECKING,
 )
 from pydantic import BaseModel, constr, validate_arguments
@@ -22,7 +23,7 @@ from pydantic import BaseModel, constr, validate_arguments
 if TYPE_CHECKING:
     from roid.app import SlashCommands
 
-from roid.exceptions import InvalidCommandOptionType
+from roid.exceptions import InvalidCommand
 from roid.interactions import (
     Interaction,
     CommandType,
@@ -44,7 +45,6 @@ class CommandContext(BaseModel):
     application_id: str
     guild_id: Optional[str]
     options: Optional[List[CommandOption]]
-    choices: Optional[List[CommandChoice]]
     default_permission: bool
 
     def __eq__(self, other: "CommandContext"):
@@ -54,7 +54,6 @@ class CommandContext(BaseModel):
             and self.application_id == other.application_id
             and self.guild_id == other.guild_id
             and self.options == other.options
-            and self.choices == other.choices
             and self.default_permission == other.default_permission
         )
 
@@ -116,6 +115,11 @@ def get_details_from_spec(
     for name, type_ in spec.annotations.items():
         choice_blocks = []
 
+        # See if we have a selection options.
+        # This is done in the same loop as options because it save manipulating
+        # the annotations again and complicating the structure.
+
+        # Try extract the original type from the hint.
         original = typing.get_origin(type_)
         if original is typing.Literal:
             target_type = None
@@ -123,7 +127,7 @@ def get_details_from_spec(
                 if target_type is None:
                     target_type = type(v)
                 elif type(v) is not target_type:
-                    raise TypeError(
+                    raise InvalidCommand(
                         f"(command: {cmd_name!r}, parameter: {name!r}) literal must be the same type."
                     )
 
@@ -135,7 +139,7 @@ def get_details_from_spec(
                 if target_type is None:
                     target_type = type(e.value)
                 elif type(e.value) is not target_type:
-                    raise TypeError(
+                    raise InvalidCommand(
                         f"(command: {cmd_name!r}, parameter: {name!r}) enum must contain all the same types."
                     )
 
@@ -144,7 +148,7 @@ def get_details_from_spec(
 
         result = OPTION_TYPE_PROCESSOR.get(type_)
         if result is None:
-            raise InvalidCommandOptionType(
+            raise InvalidCommand(
                 f"(command: {cmd_name!r}) type {type_!r} is not supported for command option / choice types."
             )
 
@@ -170,9 +174,7 @@ def get_details_from_spec(
         )
 
         if (len(choice_blocks) > 0) and (option_type not in VALID_CHOICE_TYPES):
-            raise InvalidCommandOptionType(
-                f"{type_!r} cannot be inferred for a choices option"
-            )
+            raise InvalidCommand(f"{type_!r} cannot be inferred for a choices option")
 
         if len(choice_blocks) > 0:
             kwargs["choices"] = choice_blocks
@@ -263,7 +265,7 @@ class Command:
         elif guild_id is None and guild_ids is not None:
             self.guild_ids = set(guild_ids)
         else:
-            self.guild_ids = set()
+            self.guild_ids: Optional[Set[int]] = None
 
         self.default_permission = default_permissions
         self.options = options if len(options) != 0 else None
@@ -274,7 +276,18 @@ class Command:
         self._on_error = default_on_error
 
     async def register(self, app: SlashCommands):
-        ...
+        if self.guild_ids is None:
+            await app._http.register_command(
+                None,
+                CommandContext(
+                    application_id=self.application_id,
+                    type=self.type,
+                    name=self.name,
+                    description=self.description,
+                    default_permission=self.default_permission,
+                    options=self.options if len(self.options) != 0 else None,
+                ),
+            )
 
     def _get_option_data(self, interaction: Interaction) -> dict:
         if interaction.data.options is None:
@@ -377,5 +390,11 @@ class Command:
         error handler.
 
         This will override the existing error callback.
+
+        Args:
+            func:
+                The function callback itself, this can be either a coroutine function
+                or a regular sync function (sync functions will be ran in a new
+                thread.)
         """
         self._on_error = func

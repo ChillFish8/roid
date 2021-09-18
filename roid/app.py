@@ -125,19 +125,19 @@ class SlashCommands(FastAPI):
 
             _ = self._request("DELETE", f"/commands/{cmd.id}")
 
-    def get_commands(self) -> Dict[str, CommandContext]:
-        r = self._request("GET", "/commands")
-        return {data["name"]: CommandContext(**data) for data in r.json()}
+    async def get_global_commands(self) -> Dict[str, CommandContext]:
+        data = await self._http.get_global_commands()
+        return {data["name"]: CommandContext(**data) for data in data}
 
-    def submit_commands(self):
-        registered = self.get_commands()
+    async def submit_commands(self):
+        registered = await self.get_global_commands()
         self.remove_old_global_commands(registered)
 
         for command in self._commands.values():
             if not command.defer_register:
                 continue
 
-            command.register()
+            await command.register(self)
 
     @validate_arguments
     def command(
