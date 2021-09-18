@@ -15,7 +15,7 @@ class HTTPException(RoidException):
         self.data = data
 
     def __str__(self):
-        return f"status={self.response.status_code}, message={self.data}"
+        return f"status={self.response.status_code}, message={self.data!r}"
 
     @property
     def status_code(self) -> int:
@@ -25,6 +25,9 @@ class HTTPException(RoidException):
 
 class Forbidden(HTTPException):
     """The request has been rejected due to invalid / incorrect authorization."""
+
+    def __str__(self):
+        return f"status={self.status_code} message='forbidden'"
 
 
 class NotFound(HTTPException):
@@ -36,7 +39,7 @@ class DiscordServerError(HTTPException):
 
 
 class CommandRejected(HTTPException):
-    """Raised when an invalid command is set to be registed."""
+    """Raised when an invalid command is set to be registered."""
 
     def __init__(self, status: int = 400, body: str = ""):
         self.status = status

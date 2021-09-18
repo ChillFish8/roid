@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import httpx
 import asyncio
-import sys
 import logging
 from typing import Optional, List, TYPE_CHECKING
 from datetime import datetime
@@ -17,7 +16,7 @@ except ImportError:
 if TYPE_CHECKING:
     from roid.command import Command
 
-from roid import __version__
+from roid.__version__ import __version__
 from roid.exceptions import HTTPException, DiscordServerError, Forbidden, NotFound
 
 DISCORD_DOMAIN = "discord.com"
@@ -53,6 +52,8 @@ def _parse_rate_limit_header(response: httpx.Response) -> float:
 
 
 class HttpHandler:
+    API_VERSION = "v8"
+
     def __init__(
         self,
         application_id: int,
@@ -61,36 +62,31 @@ class HttpHandler:
         self.lock = asyncio.Lock()
         self.client = httpx.AsyncClient(http2=True)
 
-        python_version = sys.version_info
         self.user_agent = (
-            f"DiscordBot (https://github.com/chillfish8/roid {__version__}) "
-            f"Python/{python_version[0]}.{python_version[1]} "
-            f"httpx/{httpx.__version__}"
+            f"DiscordBot (https://github.com/chillfish8/roid {__version__})"
         )
 
         self.application_id = application_id
         self.__token = token
-        self._primary_route = f"https://{DISCORD_DOMAIN}/applications/{application_id}"
+        self._primary_route = f"https://{DISCORD_DOMAIN}/api/{self.API_VERSION}/applications/{application_id}"
 
     async def register_command(self, guild_id: Optional[int], ctx: BaseModel):
         if guild_id is None:
             url = "/commands"
         else:
-            url = f"guilds/{guild_id}/commands"
+            url = f"/guilds/{guild_id}/commands"
 
         await self.request(
             "POST",
             url,
-            headers={"Content-Type": "application/json"},
-            data=ctx.json(),
+            json=ctx.dict(),
         )
 
     async def register_commands(self, commands: List[Command]):
         await self.request(
             "PUT",
             "/commands",
-            headers={"Content-Type": "application/json"},
-            data=json.dumps([c.ctx for c in commands]),
+            json=[c.ctx.dict() for c in commands],
         )
 
     async def get_global_commands(self) -> List[dict]:
@@ -102,7 +98,7 @@ class HttpHandler:
             "User-Agent": self.user_agent,
         }
 
-        if headers is None:
+        if headers is not None:
             set_headers = {**headers, **set_headers}
 
         url = f"{self._primary_route}{section}"
@@ -168,6 +164,7 @@ class HttpHandler:
                         raise NotFound(r, data)
                     elif r.status_code == 400:
                         errors = data["errors"]
+                        print(errors, headers)
 
                         sections = []
                         for location, detail in errors.items():
@@ -189,7 +186,7 @@ class HttpHandler:
                         continue
                     raise
                 finally:
-                    r.close()
+                    await r.aclose()
 
             if r is not None:
                 # We've run out of retries, raise.

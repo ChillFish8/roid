@@ -14,20 +14,11 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import HTTPException
 from pydantic import ValidationError, validate_arguments
 
-from roid.command import CommandType, Command, CommandContext
+from roid.command import CommandType, Command
 from roid.interactions import InteractionType, Interaction
-from roid.config import API_URL
 from roid.error_handlers import KNOWN_ERRORS
 from roid.response import ResponsePayload
 from roid.http import HttpHandler
-
-COMMANDS_ADD = f"{API_URL}/applications/{{application_id}}/commands"
-GUILD_COMMANDS_ADD = (
-    f"{API_URL}/applications/{{application_id}}/guilds/{{guild_id}}/commands"
-)
-
-GET_GLOBAL_COMMANDS = f"{API_URL}/applications/{{application_id}}/commands"
-REMOVE_GLOBAL_COMMAND = f"{API_URL}/applications/{{application_id}}"
 
 _log = logging.getLogger("roid-main")
 
@@ -55,6 +46,7 @@ class SlashCommands(FastAPI):
         # register the internal route and FastAPI internals.
         self.post("/", name="Interaction Events")(self.__root)
         self.on_event("startup")(self._startup)
+        self.on_event("shutdown")(self._shutdown)
 
     @property
     def application_id(self):
@@ -72,6 +64,9 @@ class SlashCommands(FastAPI):
                 continue
 
             await command.register(self)
+
+    async def _shutdown(self):
+        ...
 
     async def reload_global_commands(self):
         """

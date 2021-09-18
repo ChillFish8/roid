@@ -316,7 +316,7 @@ class Command:
             name=self.name,
             description=self.description,
             default_permission=self.default_permission,
-            options=self.options if len(self.options) != 0 else None,
+            options=self.options,
         )
 
     def _get_option_data(self, interaction: Interaction) -> dict:

@@ -6,7 +6,7 @@ from typing import Optional, List, Union
 
 from pydantic import BaseModel, constr, validate_arguments, AnyHttpUrl, validator
 
-from roid.config import CDN_DOMAIN
+from roid.http import DISCORD_CDN_DOMAIN
 
 
 class PremiumType(IntEnum):
@@ -47,18 +47,18 @@ class User(BaseModel):
     def avatar_url(self) -> str:
         fmt = "png"
         if self.avatar is None:
-            return f"{CDN_DOMAIN}/embed/avatars/{self.discriminator % 5}.png"
+            return f"{DISCORD_CDN_DOMAIN}/embed/avatars/{self.discriminator % 5}.png"
 
         if self.avatar.startswith("a_"):
             fmt = "gif"
 
-        return f"{CDN_DOMAIN}/avatars/{self.id}/{self.avatar}.{fmt}"
+        return f"{DISCORD_CDN_DOMAIN}/avatars/{self.id}/{self.avatar}.{fmt}"
 
     def avatar_url_as(self, *, fmt="png"):
         if self.avatar is None:
-            return f"{CDN_DOMAIN}/embed/avatars/{self.discriminator % 5}.{fmt}"
+            return f"{DISCORD_CDN_DOMAIN}/embed/avatars/{self.discriminator % 5}.{fmt}"
 
-        return f"{CDN_DOMAIN}/avatars/{self.id}/{self.avatar}.{fmt}"
+        return f"{DISCORD_CDN_DOMAIN}/avatars/{self.id}/{self.avatar}.{fmt}"
 
 
 class RoleTags(BaseModel):
