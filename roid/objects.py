@@ -4,7 +4,7 @@ from functools import reduce
 from operator import or_
 from typing import Optional, List, Union
 
-from pydantic import BaseModel, constr, validate_arguments, AnyHttpUrl
+from pydantic import BaseModel, constr, validate_arguments, AnyHttpUrl, validator
 
 from roid.config import CDN_DOMAIN
 
@@ -441,3 +441,22 @@ class PartialMessage(BaseModel):
     thread: Optional[Channel]
     sticker_items: Optional[List[StickerItem]]
     stickers: Optional[List[Sticker]]
+
+
+class AllowedMentionType(Enum):
+    ROLES = "roles"
+    USERS = "users"
+    EVERYONE = "everyone"
+
+
+class AllowedMentions(BaseModel):
+    parse: List[AllowedMentionType] = []
+    roles: List[str] = []
+    users: List[str] = []
+
+    @validator("roles", "users")
+    def convert_snowflake(cls, v):
+        try:
+            return [int(i) for i in v]
+        except ValueError:
+            raise ValueError("field contains non-integer values")

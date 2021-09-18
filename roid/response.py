@@ -4,7 +4,7 @@ from typing import List, Optional
 from pydantic import BaseModel, constr, validate_arguments
 
 from roid.components import Component, ActionRow
-from roid.objects import Embed
+from roid.objects import Embed, AllowedMentions
 
 
 class ResponseType(IntEnum):
@@ -23,7 +23,7 @@ class ResponseData(BaseModel):
     tts: Optional[bool]
     content: Optional[constr(min_length=1, max_length=2000, strip_whitespace=True)]
     embeds: Optional[List[Embed]]
-    allowed_mentions: Optional[bool]
+    allowed_mentions: Optional[AllowedMentions]
     flags: Optional[int]
     components: Optional[List[ActionRow]]
 
@@ -39,7 +39,7 @@ def response(
     *,
     embed: Embed = None,
     embeds: List[Embed] = None,
-    allowed_mentions: bool = False,
+    allowed_mentions: AllowedMentions = None,
     flags: int = None,
     tts: bool = False,
     components: Optional[List[List[Component]]] = None,
