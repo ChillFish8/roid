@@ -24,14 +24,25 @@ def _null():
 @validate_arguments
 def hyperlink(
     label: str,
-    url: str,
     *,
+    url: str,
     disabled: bool = False,
 ):
     """
     Adds a hyper linked button.
 
     This is a shortcut to defining a button with an empty body.
+
+    Args:
+        label:
+            The button label, this will be the message displayed on the hyperlink.
+            e.g. "Click Me!"
+
+        url:
+            The url to take the user to when they the button.
+
+        disabled:
+            If the button should be disabled or not. (If it can be clicked or not.)
     """
 
     btn = button(

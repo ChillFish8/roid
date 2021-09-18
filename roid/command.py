@@ -3,7 +3,7 @@ import functools
 import inspect
 import typing
 
-from enum import Enum, IntEnum
+from enum import Enum, IntEnum, auto
 from typing import List, Union, Optional, Any, Tuple, Dict, Callable, Coroutine
 from pydantic import BaseModel, constr, validate_arguments
 
@@ -15,7 +15,7 @@ from roid.interactions import (
     CommandOptionType,
     CommandChoice,
 )
-from roid.objects import Role, Channel, Member
+from roid.objects import Role, Channel, Member, PartialMessage, User
 from roid.extractors import extract_options
 from roid.checks import CommandCheck
 from roid.response import ResponsePayload
@@ -157,7 +157,14 @@ def get_details_from_spec(
 
 
 async def default_on_error(_: Interaction, exception: Exception) -> ResponsePayload:
-    raise exception
+    raise exception from None
+
+
+class PassTarget(IntEnum):
+    NONE = auto()
+    MESSAGE = auto()
+    USER = auto()
+    MEMBER = auto()
 
 
 class Command:
@@ -172,16 +179,36 @@ class Command:
         cmd_type: CommandType = CommandType.CHAT_INPUT,
     ):
         self.is_coroutine = asyncio.iscoroutinefunction(callback)
-        self.callback = callback
+        self._callback = callback
 
-        spec = inspect.getfullargspec(self.callback)
+        spec = inspect.getfullargspec(self._callback)
         annotations = spec.annotations
 
+        # Sets up how we should handle special case type hints.
+        # The pass_target is only valid for MESSAGE and USER commands,
+        # the value will be ignored for CHAT_INPUT commands.
+        #
+        # We dont want to be producing options for these special cases
+        # so we also remove them from the annotations.
+        self._pass_target: Tuple[PassTarget, str] = (PassTarget.NONE, "_")
         self._pass_interaction: Optional[str] = None
-        for param, type_ in annotations.items():
+        for param, type_ in annotations.copy().items():
             if type_ is Interaction:
+                del spec.annotations[param]
                 self._pass_interaction = param
-                break
+            elif type_ is PartialMessage:
+                del spec.annotations[param]
+                self._pass_target = (PassTarget.MESSAGE, param)
+            elif type_ is User:
+                del spec.annotations[param]
+                self._pass_target = (PassTarget.USER, param)
+            elif type_ is Member:
+                del spec.annotations[param]
+                self._pass_target = (PassTarget.MEMBER, param)
+            elif type_ is Interaction and self._pass_target is not None:
+                raise AttributeError(
+                    f"interaction is already marked to be passed to {self._pass_target!r}"
+                )
 
         options = []
         self._defaults: Dict[str, Any] = {}
@@ -206,7 +233,7 @@ class Command:
             options=options if len(options) != 0 else None,
         )
 
-        self.callback = validate_arguments(self.callback)
+        self._callback = validate_arguments(self._callback)
         self._checks_pipeline: List[CommandCheck] = []
         self._on_error = default_on_error
 
@@ -225,18 +252,71 @@ class Command:
     def __call__(self, interaction: Interaction):
         return self._run_checks_pipeline(interaction)
 
-    def add_check(self, check: CommandCheck):
-        self._checks_pipeline.append(check)
+    def add_check(self, check: CommandCheck, *, at: int = -1):
+        """
+        Adds a check object to the command's check pipeline.
+
+        Checks are ran in the order they are added and can directly
+        modify the interaction data passed to the following checks.
+
+        Args:
+            check:
+                The check object itself.
+
+            at:
+                The desired index to insert the check at.
+                If the index is beyond the current length of the pipeline
+                the check is appended to the end.
+        """
+
+        if 0 <= at < len(self._checks_pipeline):
+            self._checks_pipeline.insert(at, check)
+        else:
+            self._checks_pipeline.append(check)
+
+    def _get_invoke_kwargs(self, interaction: Interaction) -> dict:
+        """
+        Creates the kwarg dictionary for the command to be invoked based off
+        of the interaction.
+
+        If this is a non CHAT_INPUT command type the internal `pass_target`
+        variable is used to determine if the targeted message / user should be
+        passed directly.
+        """
+
+        cmd_type = self.ctx.type
+        pass_target, pass_name = self._pass_target
+        if cmd_type == CommandType.CHAT_INPUT:
+            return self._get_option_data(interaction)
+        elif cmd_type == CommandType.MESSAGE and pass_target == PassTarget.MESSAGE:
+            return {
+                pass_name: interaction.data.resolved.messages[
+                    interaction.data.target_id
+                ]
+            }
+        elif cmd_type == CommandType.USER and pass_target == PassTarget.USER:
+            return {
+                pass_name: interaction.data.resolved.users[interaction.data.target_id]
+            }
+        elif cmd_type == CommandType.USER and pass_target == PassTarget.MEMBER:
+            target_id = interaction.data.target_id
+            member = interaction.data.resolved.members[target_id]
+            user = interaction.data.resolved.users[target_id]
+            member.user = user
+            return {pass_name: member}
+        else:
+            return {}
 
     async def _invoke(self, interaction: Interaction) -> ResponsePayload:
-        kwargs = self._get_option_data(interaction)
+        kwargs = self._get_invoke_kwargs(interaction)
+
         if self._pass_interaction is not None:
             kwargs[self._pass_interaction] = interaction
 
         if self.is_coroutine:
-            return await self.callback(**kwargs)
+            return await self._callback(**kwargs)
 
-        partial = functools.partial(self.callback, **kwargs)
+        partial = functools.partial(self._callback, **kwargs)
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, partial)
 

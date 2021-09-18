@@ -109,7 +109,7 @@ class SlashCommands(FastAPI):
                 handler = self._global_error_handlers.get(type(e))
                 if handler is not None:
                     return handler(e)
-                raise e
+                raise e from None
 
         elif interaction.type == InteractionType.MESSAGE_COMPONENT:
             ...
