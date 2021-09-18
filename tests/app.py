@@ -1,11 +1,14 @@
+import json
 import os
 from enum import Enum
 import uvicorn
 import logging
 
-from roid import SlashCommands, response, Embed
+from roid import SlashCommands, response, Embed, CommandType
+from roid.components import ButtonStyle
 from roid.objects import MemberPermissions
-from roid.helpers import require_user_permissions
+from roid.helpers import require_user_permissions, hyperlink
+from roid import components
 
 logging.basicConfig(level=logging.INFO)
 
@@ -22,14 +25,27 @@ class TestAnimal(Enum):
 
 
 @require_user_permissions(MemberPermissions.ADMINISTRATOR)
-@app.command("say-hello", "wave to me", guild_id=675647130647658527)
-async def test(animal: TestAnimal):
-    return response(
-        embed=Embed(title=f"Hello, world: {animal.value}", color=0xFFFFF),
+@app.command("say-hello", type=CommandType.MESSAGE, guild_id=675647130647658527)
+async def test():
+    resp = response(
+        embed=Embed(title=f"Hello, world", color=0xFFFFF),
+        components=[
+            [
+                test_button_click,
+                hyperlink("https://pydantic-docs.helpmanual.io/usage/types/#urls"),
+            ]
+        ],
     )
+    print(f"returning:\n {json.dumps(resp.dict(), indent=4)}")
+
+    return resp
 
 
-@test.button(style="Primary", label="Click me", emoji="aaa")
+@components.button(
+    style=ButtonStyle.PRIMARY,
+    label="Click me",
+    emoji="<:CrunchyRollLogo:676087821596885013>",
+)
 async def test_button_click():
     ...
 

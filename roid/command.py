@@ -5,8 +5,7 @@ import typing
 
 from enum import Enum, IntEnum
 from typing import List, Union, Optional, Any, Tuple, Dict, Callable, Coroutine
-
-from pydantic import BaseModel, constr, validate_arguments, conint, AnyHttpUrl
+from pydantic import BaseModel, constr, validate_arguments
 
 from roid.exceptions import InvalidCommandOptionType
 from roid.interactions import (
@@ -18,7 +17,6 @@ from roid.interactions import (
 )
 from roid.objects import Role, Channel, Member
 from roid.extractors import extract_options
-from roid.components import ButtonStyle
 from roid.checks import CommandCheck
 from roid.response import ResponsePayload
 
@@ -26,7 +24,7 @@ from roid.response import ResponsePayload
 class CommandContext(BaseModel):
     type: CommandType
     name: constr(max_length=32, min_length=1)
-    description: str
+    description: Optional[str]
     application_id: str
     guild_id: Optional[str]
     options: Optional[List[CommandOption]]
@@ -167,8 +165,8 @@ class Command:
         self,
         callback,
         name: str,
-        description: str,
         application_id: int,
+        description: Optional[str] = None,
         default_permissions: bool = False,
         guild_id: Optional[int] = None,
         cmd_type: CommandType = CommandType.CHAT_INPUT,
@@ -189,6 +187,9 @@ class Command:
         self._defaults: Dict[str, Any] = {}
 
         for option, default in get_details_from_spec(name, spec):
+            if cmd_type in (CommandType.MESSAGE, CommandType.USER):
+                raise ValueError(f"only CHAT_INPUT types can have options / input")
+
             options.append(option)
             self._defaults[option.name] = default
 
@@ -252,41 +253,10 @@ class Command:
         self,
         func: Callable[[Interaction, Exception], Coroutine[Any, Any, ResponsePayload]],
     ):
+        """
+        Maps the given error handling coroutine function to the commands general
+        error handler.
+
+        This will override the existing error callback.
+        """
         self._on_error = func
-
-    @validate_arguments
-    def button(
-        self,
-        style: ButtonStyle,
-        *,
-        custom_id: Optional[str] = None,
-        disabled: bool = False,
-        row: Optional[conint(ge=1, le=5)] = None,
-        inline: bool = True,
-        label: str = None,
-        emoji: constr(
-            strip_whitespace=True, regex="(<a?:[a-zA-Z0-9]+:[0-9]{17,26}>)"
-        ) = None,
-        url: Optional[AnyHttpUrl] = None,
-    ):
-        def wrapper(func):
-            ...
-
-        return wrapper
-
-    @validate_arguments
-    def select(
-        self,
-        *,
-        custom_id: Optional[str] = None,
-        disabled: bool = False,
-        row: Optional[conint(ge=1, le=5)] = None,
-        inline: bool = True,
-        placeholder: str = "Select an option.",
-        min_values: conint(ge=0, le=25) = 1,
-        max_values: conint(ge=0, le=25) = 1,
-    ):
-        def wrapper(func):
-            ...
-
-        return wrapper

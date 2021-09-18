@@ -1,4 +1,3 @@
-import json
 import time
 
 import httpx
@@ -8,10 +7,10 @@ import logging
 from nacl.signing import VerifyKey
 from nacl.exceptions import BadSignatureError
 
-from typing import Dict, List, Type, Callable
+from typing import Dict, Type, Callable, Coroutine, Any, Union
 from fastapi import FastAPI, Request
 from fastapi.exceptions import HTTPException
-from pydantic import ValidationError
+from pydantic import ValidationError, validate_arguments
 
 from roid.command import CommandType, Command
 from roid import exceptions
@@ -190,21 +189,26 @@ class SlashCommands(FastAPI):
                 data=command.ctx.json(),
             )
 
+    @validate_arguments
     def command(
         self,
         name: str,
-        description: str = "",
-        cmd_type: CommandType = CommandType.CHAT_INPUT,
+        description: str = None,
+        *,
+        type: CommandType = CommandType.CHAT_INPUT,  # noqa
         guild_id: int = None,
         default_permissions: bool = True,
     ):
+        if type in (CommandType.MESSAGE, CommandType.USER) and description is not None:
+            raise ValueError(f"only CHAT_INPUT types can have a set description")
+
         def wrapper(func):
             cmd = Command(
                 callback=func,
                 name=name,
                 description=description,
                 application_id=self.application_id,
-                cmd_type=cmd_type,
+                cmd_type=type,
                 guild_id=guild_id,
                 default_permissions=default_permissions,
             )

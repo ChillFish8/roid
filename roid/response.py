@@ -1,8 +1,9 @@
 from enum import IntEnum
 from typing import List, Optional
 
-from pydantic import BaseModel, constr
+from pydantic import BaseModel, constr, validate_arguments
 
+from roid.components import Component, ActionRow
 from roid.objects import Embed
 
 
@@ -24,6 +25,7 @@ class ResponseData(BaseModel):
     embeds: Optional[List[Embed]]
     allowed_mentions: Optional[bool]
     flags: Optional[int]
+    components: Optional[List[ActionRow]]
 
 
 class ResponsePayload(BaseModel):
@@ -31,6 +33,7 @@ class ResponsePayload(BaseModel):
     data: Optional[ResponseData] = None
 
 
+@validate_arguments(config={"arbitrary_types_allowed": True})
 def response(
     content: str = None,
     *,
@@ -39,11 +42,26 @@ def response(
     allowed_mentions: bool = False,
     flags: int = None,
     tts: bool = False,
+    components: Optional[List[List[Component]]] = None,
 ) -> ResponsePayload:
     embeds = embeds or []
 
     if embed is not None:
         embeds.append(embed)
+
+    action_rows = []
+    if components is not None:
+        for block in components:
+            component_block = []
+            for c in block:
+                if not isinstance(c, Component):
+                    raise TypeError(
+                        f"invalid component given, expected type `Component` got {type(c)!r}"
+                    )
+
+                component_block.append(c.data)
+            action_row = ActionRow(components=component_block)
+            action_rows.append(action_row)
 
     data = ResponseData(
         tts=tts,
@@ -51,6 +69,7 @@ def response(
         flags=flags,
         embeds=embeds if embeds else None,
         content=content,
+        components=components and action_rows,
     )
 
     return ResponsePayload(type=ResponseType.CHANNEL_MESSAGE_WITH_SOURCE, data=data)

@@ -1,10 +1,8 @@
-from __future__ import annotations
-
 from functools import reduce
 from operator import or_
 from typing import Optional, Union, List, Callable
 
-from pydantic import AnyHttpUrl, conint, validate_arguments
+from pydantic import validate_arguments
 
 from roid.checks import (
     SyncOrAsyncCallableError,
@@ -13,7 +11,7 @@ from roid.checks import (
     CheckError,
 )
 from roid.command import Command
-from roid.components import ButtonStyle
+from roid.components import ButtonStyle, button
 from roid.objects import MemberPermissions
 from roid.response import ResponsePayload
 from roid.interactions import Interaction
@@ -24,41 +22,25 @@ def _null():
 
 
 @validate_arguments
-def hyperlink_button(
-    url: AnyHttpUrl,
+def hyperlink(
+    label: str,
+    url: str,
     *,
-    row: Optional[conint(ge=1, le=5)] = None,
-    inline: bool = True,
-    custom_id: Optional[str] = None,
     disabled: bool = False,
 ):
     """
-    Adds a hyper linked button to the command.
+    Adds a hyper linked button.
 
-    This is basically a shortcut for defining a button that doesnt
-    get invoked by the interactions due to being a url.
+    This is a shortcut to defining a button with an empty body.
     """
 
-    def wrapper(func):
-        if not isinstance(func, Command):
-            raise TypeError(
-                f"cannot apply hyper link button to {func!r}, "
-                f"buttons can only be applied to roid.Command's.\n"
-                f"Did you put the decorators the wrong way around?\n"
-            )
-
-        func.button(
-            style=ButtonStyle.Link,
-            row=row,
-            inline=inline,
-            custom_id=custom_id,
-            disabled=disabled,
-            url=url,
-        )(_null)
-
-        return func
-
-    return wrapper
+    btn = button(
+        style=ButtonStyle.Link,
+        disabled=disabled,
+        label=label,
+        url=url,  # noqa
+    )(_null)
+    return btn
 
 
 @validate_arguments
