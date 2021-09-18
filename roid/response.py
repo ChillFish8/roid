@@ -44,6 +44,38 @@ def response(
     tts: bool = False,
     components: Optional[List[List[Component]]] = None,
 ) -> ResponsePayload:
+    """
+    A response to the given interaction.
+    You need to pass an embed, embeds, content or a mixture of the 3.
+    If not values are passed this will result in a ValueError.
+
+    Args:
+        content:
+            The content of the message to respond with.
+
+        embed:
+            The rich embed to respond with.
+
+        embeds:
+            A list of rich embeds to respond with.
+
+        allowed_mentions:
+            An optional `AllowedMentions` object that describes what mentions to allow or suppress.
+
+        flags:
+            A set of `ResponseFlags` these are bitflags so can be
+            joined via the `|` operator.
+
+        tts:
+            Indicates if the message should be sent using text-to-speech.
+
+        components:
+            A optional list of components to attach to the response.
+
+    Returns:
+        A `ResponsePayload` object.
+    """
+
     embeds = embeds or []
 
     if embed is not None:

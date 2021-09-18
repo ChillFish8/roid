@@ -7,12 +7,12 @@ import logging
 from nacl.signing import VerifyKey
 from nacl.exceptions import BadSignatureError
 
-from typing import Dict, Type, Callable, Coroutine, Any, Union
+from typing import Dict, Type, Callable, Coroutine, Any, Union, List
 from fastapi import FastAPI, Request
 from fastapi.exceptions import HTTPException
 from pydantic import ValidationError, validate_arguments
 
-from roid.command import CommandType, Command
+from roid.command import CommandType, Command, CommandContext
 from roid import exceptions
 from roid.interactions import InteractionType, Interaction
 from roid.config import API_URL
@@ -161,21 +161,29 @@ class SlashCommands(FastAPI):
             raise exceptions.HTTPException(status=400, body="\n".join(sections))
         return r
 
-    def remove_old_global_commands(self):
-        r = self._request("GET", "/commands")
-        data = r.json()
-
-        for cmd in data:
-            if cmd["name"] in self._commands:
+    def remove_old_global_commands(self, registered: Dict[str, CommandContext]):
+        for cmd in registered.values():
+            if cmd.name in self._commands:
                 continue
 
-            _ = self._request("DELETE", f"/commands/{cmd['id']}")
+            _ = self._request("DELETE", f"/commands/{cmd.id}")
+
+    def get_commands(self) -> Dict[str, CommandContext]:
+        r = self._request("GET", "/commands")
+        return {data["name"]: CommandContext(**data) for data in r.json()}
 
     def submit_commands(self):
-        self.remove_old_global_commands()
+        registered = self.get_commands()
+        self.remove_old_global_commands(registered)
 
         for command in self._commands.values():
-            logger.info(f"submitting command: {command.ctx!r}")
+            if (not command.register) or (command.ctx in registered.values()):
+                continue
+
+            if command.ctx.name in registered:
+                logger.info(f"updating command: {command.ctx!r}")
+            else:
+                logger.info(f"submitting command: {command.ctx!r}")
 
             if command.ctx.guild_id is None:
                 url = f"/commands"
@@ -198,6 +206,7 @@ class SlashCommands(FastAPI):
         type: CommandType = CommandType.CHAT_INPUT,  # noqa
         guild_id: int = None,
         default_permissions: bool = True,
+        defer_register: bool = False,
     ):
         if type in (CommandType.MESSAGE, CommandType.USER) and description is not None:
             raise ValueError(f"only CHAT_INPUT types can have a set description")
@@ -211,6 +220,7 @@ class SlashCommands(FastAPI):
                 cmd_type=type,
                 guild_id=guild_id,
                 default_permissions=default_permissions,
+                register=not defer_register,
             )
 
             self._commands[name] = cmd

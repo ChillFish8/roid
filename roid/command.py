@@ -22,6 +22,7 @@ from roid.response import ResponsePayload
 
 
 class CommandContext(BaseModel):
+    id: Optional[str]
     type: CommandType
     name: constr(max_length=32, min_length=1)
     description: Optional[str]
@@ -30,6 +31,15 @@ class CommandContext(BaseModel):
     options: Optional[List[CommandOption]]
     choices: Optional[List[CommandChoice]]
     default_permission: bool
+
+    def __eq__(self, other: "CommandContext"):
+        dict_self = self.dict()
+        dict_other = self.dict()
+
+        dict_self.pop("id", None)
+        dict_other.pop("id", None)
+
+        return dict_self == dict_other
 
 
 class SetValue:
@@ -177,8 +187,10 @@ class Command:
         default_permissions: bool = False,
         guild_id: Optional[int] = None,
         cmd_type: CommandType = CommandType.CHAT_INPUT,
+        register: bool = True,
     ):
-        self.is_coroutine = asyncio.iscoroutinefunction(callback)
+        self.register = register
+        self._is_coroutine = asyncio.iscoroutinefunction(callback)
         self._callback = callback
 
         spec = inspect.getfullargspec(self._callback)
@@ -313,7 +325,7 @@ class Command:
         if self._pass_interaction is not None:
             kwargs[self._pass_interaction] = interaction
 
-        if self.is_coroutine:
+        if self._is_coroutine:
             return await self._callback(**kwargs)
 
         partial = functools.partial(self._callback, **kwargs)

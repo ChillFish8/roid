@@ -27,7 +27,7 @@ class TestAnimal(Enum):
 @require_user_permissions(MemberPermissions.ADMINISTRATOR)
 @app.command("say-hello", type=CommandType.USER, guild_id=675647130647658527)
 async def test(interaction: Interaction, message: User):
-    print(message)
+    pprint.pprint(interaction.dict())
 
     resp = response(
         embed=Embed(title=f"Hello, world", color=0xFFFFF),
