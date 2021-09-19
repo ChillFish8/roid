@@ -156,7 +156,7 @@ class Response:
         if self.delete_parent and self.is_empty:
             self._payload.content = "Deleted parent."
             self._payload.flags = ResponseFlags.EPHEMERAL
-            return ResponsePayload(type=ResponseType.CHANNEL_MESSAGE_WITH_SOURCE)
+            return ResponsePayload(type=ResponseType.DEFERRED_UPDATE_MESSAGE)
 
         if self.is_empty:
             return ResponsePayload(type=ResponseType.DEFERRED_UPDATE_MESSAGE)

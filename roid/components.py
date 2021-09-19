@@ -1,11 +1,20 @@
 from __future__ import annotations
 
-import pprint
 import re
 import asyncio
 import functools
-from enum import IntEnum, auto
-from typing import Optional, Union, List, Callable, Any, Coroutine, TYPE_CHECKING, Tuple
+from enum import IntEnum, auto, Enum
+from typing import (
+    Optional,
+    Union,
+    List,
+    Callable,
+    Any,
+    Coroutine,
+    TYPE_CHECKING,
+    Tuple,
+    Type,
+)
 from pydantic import BaseModel, conint, AnyHttpUrl, constr, validate_arguments
 
 from roid.exceptions import InvalidComponent, AbortInvoke
@@ -97,6 +106,12 @@ class SelectValue:
 
         self.emoji = emoji
 
+    def __eq__(self, other):
+        return self.value == other
+
+    def __hash__(self):
+        return hash(self.value)
+
 
 class InvokeContext(dict):
     """A custom type wrapper to allow for detection in annotations."""
@@ -142,6 +157,8 @@ class Component(OptionalAsyncCallable):
         min_values: Optional[conint(ge=0, le=25)] = None,
         max_values: Optional[conint(ge=0, le=25)] = None,
         oneshot: bool = False,
+        *,
+        options_parameter: str = None,
     ):
         """
         A given discord component that invokes a callback that's
@@ -187,6 +204,8 @@ class Component(OptionalAsyncCallable):
             max_values=max_values,
         )
 
+        self._target_options_parameter = options_parameter
+
         pass_context_to: Optional[str] = None
         for param, hint in self.annotations.items():
             if hint is InvokeContext and pass_context_to is not None:
@@ -220,6 +239,7 @@ class Component(OptionalAsyncCallable):
 
         if resp.delete_parent and (parent is not None):
             await self.app._http.delete_interaction_message(parent.token)
+
         return resp
 
     async def _invoke(self, interaction: Interaction) -> Tuple[Response, Interaction]:
@@ -233,7 +253,8 @@ class Component(OptionalAsyncCallable):
         return await loop.run_in_executor(None, partial), parent
 
     async def _get_kwargs(
-        self, interaction: Interaction
+        self,
+        interaction: Interaction,
     ) -> Tuple[dict, Optional[Interaction]]:
         _, *reference_id = interaction.data.custom_id.split(":", maxsplit=1)
 
@@ -259,7 +280,7 @@ class Component(OptionalAsyncCallable):
         if self._oneshot:
             await state.remove(reference_id)
 
-        if self._ctx.options is not None:
-            pprint.pprint(interaction.dict())
+        if self._ctx.options is not None and interaction.data.values is not None:
+            kwargs[self._target_options_parameter] = interaction.data.values
 
         return kwargs, ctx and ctx.get("parent")

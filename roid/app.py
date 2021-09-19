@@ -1,3 +1,4 @@
+import pprint
 import re
 import logging
 import uuid
@@ -227,6 +228,7 @@ class SlashCommands(FastAPI):
             return {"type": ResponseType.PONG}
         elif interaction.type == InteractionType.APPLICATION_COMMAND:
             cmd = self._commands.get(interaction.data.name)
+            print(cmd)
             if cmd is None:
                 raise HTTPException(status_code=400, detail="No command found")
 
@@ -554,7 +556,6 @@ class SlashCommands(FastAPI):
         def wrapper(func):
             spec = inspect.getfullargspec(func)
 
-            options = []
             for param, hint in spec.annotations.items():
                 if hint is Interaction:
                     continue
@@ -574,6 +575,10 @@ class SlashCommands(FastAPI):
                     raise ValueError(f"Select options must contain at least one value.")
 
                 break
+            else:
+                raise TypeError(
+                    "function missing select value parameter and type hints."
+                )
 
             component = Component(
                 app=self,
@@ -586,6 +591,7 @@ class SlashCommands(FastAPI):
                 max_values=max_values,
                 oneshot=oneshot,
                 options=options,
+                options_parameter=param,
             )
 
             if custom_id in self._components:

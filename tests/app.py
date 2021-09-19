@@ -33,6 +33,8 @@ class TestAnimal(Enum):
     guild_id=675647130647658527,
 )
 async def test():
+    print("being called again")
+
     resp = Response(
         embed=Embed(title=f"Hello, world", color=0xFFFFF),
         components=[
@@ -69,7 +71,8 @@ class TestSelect(Enum):
 
 @app.select(min_values=1, max_values=3)
 async def test_selection(choices: List[TestSelect]):
-    ...
+    print(choices)
+    return Response(delete_parent=True)
 
 
 if __name__ == "__main__":
