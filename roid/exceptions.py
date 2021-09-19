@@ -1,10 +1,47 @@
+from __future__ import annotations
+
 import httpx
 
-from typing import Any
+from typing import Any, TYPE_CHECKING, List, Optional, Dict, Union
+
+if TYPE_CHECKING:
+    from roid.components import Component
+    from roid.deferred import DeferredComponent
+    from roid.objects import AllowedMentions
+    from roid import Response, Embed, ResponseType
 
 
 class RoidException(Exception):
     """The catch all for any roid exceptions which should be catchable."""
+
+
+class AbortInvoke(RoidException):
+    """A helper class that can be raised and caught by the system to override a response."""
+
+    def __init__(
+        self,
+        content: str = None,
+        *,
+        embed: Embed = None,
+        embeds: List[Embed] = None,
+        allowed_mentions: AllowedMentions = None,
+        flags: int = None,
+        tts: bool = False,
+        components: Optional[List[List[Union[Component, DeferredComponent]]]] = None,
+        component_context: Optional[Dict[str, Any]] = None,
+        response_type: Optional[ResponseType] = None,
+    ):
+        self.details = dict(
+            content=content,
+            embed=embed,
+            embeds=embeds,
+            allowed_mentions=allowed_mentions,
+            flags=flags,
+            tts=tts,
+            components=components,
+            component_context=component_context,
+            response_type=response_type,
+        )
 
 
 class HTTPException(RoidException):

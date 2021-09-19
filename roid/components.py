@@ -4,15 +4,15 @@ from enum import IntEnum, auto
 from typing import Optional, Union, List, Callable, Any, Coroutine, TYPE_CHECKING
 from pydantic import BaseModel, conint, AnyHttpUrl, constr
 
-from roid.exceptions import InvalidComponent
-from roid.objects import PartialEmoji
+from roid.exceptions import InvalidComponent, AbortInvoke
+from roid.objects import PartialEmoji, ResponseFlags, ResponseType
 from roid.state import COMMAND_STATE_TARGET
 from roid.callers import OptionalAsyncCallable
 from roid.state import PrefixedState
 
 if TYPE_CHECKING:
-    from roid.app import SlashCommands
     from roid.interactions import Interaction
+    from roid.app import SlashCommands
     from roid.response import ResponsePayload
 
     SyncOrAsyncCallable = Callable[
@@ -74,7 +74,7 @@ class InvokeContext(dict):
         self.__state = state
         self.__reference_id = reference_id
 
-    async def purge(self):
+    async def destroy(self):
         """
         Removes the context from the state.
 
@@ -168,7 +168,11 @@ class Component(OptionalAsyncCallable):
             ctx = await state.get(reference_id)
 
             if ctx is None and (self._pass_context_to not in self.defaults):
-                kwargs[self._pass_context_to] = {}
+                raise AbortInvoke(
+                    content="This button has expired.",
+                    flags=ResponseFlags.EPHEMERAL,
+                    response_type=ResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                )
             elif ctx is not None:
                 kwargs[self._pass_context_to] = InvokeContext(
                     reference_id, state, **ctx
@@ -176,4 +180,5 @@ class Component(OptionalAsyncCallable):
 
                 if self._oneshot:
                     await state.remove(reference_id)
+
         return kwargs

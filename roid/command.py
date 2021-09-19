@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import pprint
-import uuid
-import inspect
 import typing
 
 from enum import Enum, IntEnum, auto
@@ -18,10 +15,7 @@ from typing import (
     Set,
     TYPE_CHECKING,
 )
-from pydantic import BaseModel, constr, validate_arguments
-
-from roid.components import Component, ActionRow
-from roid.deferred import DeferredComponent
+from pydantic import BaseModel, constr
 
 if TYPE_CHECKING:
     from roid.app import SlashCommands
@@ -37,13 +31,7 @@ from roid.interactions import (
 from roid.objects import Role, Channel, Member, PartialMessage, User
 from roid.extractors import extract_options
 from roid.checks import CommandCheck
-from roid.response import (
-    ResponsePayload,
-    DeferredResponsePayload,
-    ResponseType,
-    ResponseData,
-)
-from roid.state import COMMAND_STATE_TARGET
+from roid.response import ResponsePayload
 from roid.callers import OptionalAsyncCallable
 
 
@@ -111,91 +99,6 @@ OPTION_TYPE_PROCESSOR = {
 }
 
 
-def get_details_from_spec(
-    cmd_name: str,
-    spec: inspect.FullArgSpec,
-) -> List[Tuple[CommandOption, Any]]:
-    options = []
-
-    default_args = {}
-    if spec.defaults is not None:
-        delta = len(spec.args) - len(spec.defaults)
-        default_args = dict(zip(spec.args[delta:], spec.defaults))
-
-    for name, type_ in spec.annotations.items():
-        choice_blocks = []
-
-        # See if we have a selection options.
-        # This is done in the same loop as options because it save manipulating
-        # the annotations again and complicating the structure.
-
-        # Try extract the original type from the hint.
-        original = typing.get_origin(type_)
-        if original is typing.Literal:
-            target_type = None
-            for v in typing.get_args(type_):
-                if target_type is None:
-                    target_type = type(v)
-                elif type(v) is not target_type:
-                    raise InvalidCommand(
-                        f"(command: {cmd_name!r}, parameter: {name!r}) literal must be the same type."
-                    )
-
-                choice_blocks.append(CommandChoice(name=v, value=v))
-            type_ = target_type
-        elif issubclass(type_, (Enum, IntEnum)):
-            target_type = None
-            for e in type_:
-                if target_type is None:
-                    target_type = type(e.value)
-                elif type(e.value) is not target_type:
-                    raise InvalidCommand(
-                        f"(command: {cmd_name!r}, parameter: {name!r}) enum must contain all the same types."
-                    )
-
-                choice_blocks.append(CommandChoice(name=str(e.value), value=e.value))
-            type_ = target_type
-
-        # See if its a type we recognise for conversion otherwise reject it.
-        result = OPTION_TYPE_PROCESSOR.get(type_)
-        if result is None:
-            raise InvalidCommand(
-                f"(command: {cmd_name!r}) type {type_!r} is not supported for command option / choice types."
-            )
-
-        option_type, description = result
-        if name in default_args:
-            default = default_args[name]
-        else:
-            default = Ellipsis
-
-        required = default is Ellipsis
-        if isinstance(default, SetValue):
-            name = default.name or name
-            description = default.description or description
-            required = default.default is Ellipsis
-        elif len(choice_blocks) > 0:
-            description = "Select an option from the list."
-
-        kwargs = dict(
-            name=name,
-            description=description,
-            type=option_type,
-            required=required,
-        )
-
-        if (len(choice_blocks) > 0) and (option_type not in VALID_CHOICE_TYPES):
-            raise InvalidCommand(f"{type_!r} cannot be inferred for a choices option")
-
-        if len(choice_blocks) > 0:
-            kwargs["choices"] = choice_blocks
-
-        opt = CommandOption(**kwargs)
-        options.append((opt, default))
-
-    return options
-
-
 async def default_on_error(_: Interaction, exception: Exception) -> ResponsePayload:
     raise exception from None
 
@@ -222,9 +125,9 @@ class Command(OptionalAsyncCallable):
         defer_register: bool = True,
     ):
         super().__init__(
-            callback=validate_arguments(callback),
+            callback=callback,
             on_error=default_on_error,
-            callback_is_async=True,  # override to prevent validate_arguments issue.
+            validate=True,
         )
 
         self.app = app
@@ -237,12 +140,8 @@ class Command(OptionalAsyncCallable):
         # We dont want to be producing options for these special cases
         # so we also remove them from the annotations.
         self._pass_target: Tuple[PassTarget, str] = (PassTarget.NONE, "_")
-        self._pass_interaction: Optional[str] = None
         for param, type_ in self.annotations.copy().items():
-            if type_ is Interaction:
-                del self.annotations[param]
-                self._pass_interaction = param
-            elif type_ is PartialMessage:
+            if type_ is PartialMessage:
                 del self.annotations[param]
                 self._pass_target = (PassTarget.MESSAGE, param)
             elif type_ is User:
@@ -251,20 +150,16 @@ class Command(OptionalAsyncCallable):
             elif type_ is Member:
                 del self.annotations[param]
                 self._pass_target = (PassTarget.MEMBER, param)
-            elif type_ is Interaction and self._pass_target is not None:
-                raise AttributeError(
-                    f"interaction is already marked to be passed to {self._pass_target!r}"
-                )
 
         options = []
-        self._defaults: Dict[str, Any] = {}
+        self._option_defaults: Dict[str, Any] = {}
 
-        for option, default in get_details_from_spec(name, self.spec):
+        for option, default in self.get_details_from_spec(name):
             if cmd_type in (CommandType.MESSAGE, CommandType.USER):
                 raise ValueError(f"only CHAT_INPUT types can have options / input")
 
             options.append(option)
-            self._defaults[option.name] = default
+            self._option_defaults[option.name] = default
 
             if option.choices is None:
                 continue
@@ -288,6 +183,88 @@ class Command(OptionalAsyncCallable):
         self.options = options if len(options) != 0 else None
 
         self._checks_pipeline: List[CommandCheck] = []
+
+    def get_details_from_spec(
+        self,
+        cmd_name: str,
+    ) -> List[Tuple[CommandOption, Any]]:
+        options = []
+        for name, type_ in self.annotations.items():
+            choice_blocks = []
+
+            # See if we have a selection options.
+            # This is done in the same loop as options because it save manipulating
+            # the annotations again and complicating the structure.
+
+            # Try extract the original type from the hint.
+            original = typing.get_origin(type_)
+            if original is typing.Literal:
+                target_type = None
+                for v in typing.get_args(type_):
+                    if target_type is None:
+                        target_type = type(v)
+                    elif type(v) is not target_type:
+                        raise InvalidCommand(
+                            f"(command: {cmd_name!r}, parameter: {name!r}) literal must be the same type."
+                        )
+
+                    choice_blocks.append(CommandChoice(name=v, value=v))
+                type_ = target_type
+            elif issubclass(type_, (Enum, IntEnum)):
+                target_type = None
+                for e in type_:
+                    if target_type is None:
+                        target_type = type(e.value)
+                    elif type(e.value) is not target_type:
+                        raise InvalidCommand(
+                            f"(command: {cmd_name!r}, parameter: {name!r}) enum must contain all the same types."
+                        )
+
+                    choice_blocks.append(
+                        CommandChoice(name=str(e.value), value=e.value)
+                    )
+                type_ = target_type
+
+            # See if its a type we recognise for conversion otherwise reject it.
+            result = OPTION_TYPE_PROCESSOR.get(type_)
+            if result is None:
+                raise InvalidCommand(
+                    f"(command: {cmd_name!r}) type {type_!r} is not supported for command option / choice types."
+                )
+
+            option_type, description = result
+            if name in self.defaults:
+                default = self.defaults[name]
+            else:
+                default = Ellipsis
+
+            required = default is Ellipsis
+            if isinstance(default, SetValue):
+                name = default.name or name
+                description = default.description or description
+                required = default.default is Ellipsis
+            elif len(choice_blocks) > 0:
+                description = "Select an option from the list."
+
+            kwargs = dict(
+                name=name,
+                description=description,
+                type=option_type,
+                required=required,
+            )
+
+            if (len(choice_blocks) > 0) and (option_type not in VALID_CHOICE_TYPES):
+                raise InvalidCommand(
+                    f"{type_!r} cannot be inferred for a choices option"
+                )
+
+            if len(choice_blocks) > 0:
+                kwargs["choices"] = choice_blocks
+
+            opt = CommandOption(**kwargs)
+            options.append((opt, default))
+
+        return options
 
     async def register(self, app: SlashCommands):
         """
@@ -334,7 +311,7 @@ class Command(OptionalAsyncCallable):
 
         options = extract_options(interaction)
 
-        for name, default in self._defaults.items():
+        for name, default in self._option_defaults.items():
             if name not in options:
                 options[name] = default
 
@@ -362,7 +339,7 @@ class Command(OptionalAsyncCallable):
         else:
             self._checks_pipeline.append(check)
 
-    def _get_invoke_kwargs(self, interaction: Interaction) -> dict:
+    async def _get_kwargs(self, interaction: Interaction) -> dict:
         """
         Creates the kwarg dictionary for the command to be invoked based off
         of the interaction.
@@ -372,18 +349,21 @@ class Command(OptionalAsyncCallable):
         passed directly.
         """
 
+        kwargs = await super()._get_kwargs(interaction)
+
+        extend = {}
         cmd_type = self.type
         pass_target, pass_name = self._pass_target
         if cmd_type == CommandType.CHAT_INPUT:
-            return self._get_option_data(interaction)
+            extend = self._get_option_data(interaction)
         elif cmd_type == CommandType.MESSAGE and pass_target == PassTarget.MESSAGE:
-            return {
+            extend = {
                 pass_name: interaction.data.resolved.messages[
                     interaction.data.target_id
                 ]
             }
         elif cmd_type == CommandType.USER and pass_target == PassTarget.USER:
-            return {
+            extend = {
                 pass_name: interaction.data.resolved.users[interaction.data.target_id]
             }
         elif cmd_type == CommandType.USER and pass_target == PassTarget.MEMBER:
@@ -391,17 +371,9 @@ class Command(OptionalAsyncCallable):
             member = interaction.data.resolved.members[target_id]
             user = interaction.data.resolved.users[target_id]
             member.user = user
-            return {pass_name: member}
-        else:
-            return {}
+            extend = {pass_name: member}
 
-    async def _get_kwargs(self, interaction: Interaction) -> dict:
-        kwargs = self._get_invoke_kwargs(interaction)
-
-        if self._pass_interaction is not None:
-            kwargs[self._pass_interaction] = interaction
-
-        return kwargs
+        return {**kwargs, **extend}
 
     async def __call__(self, interaction: Interaction) -> ResponsePayload:
         try:

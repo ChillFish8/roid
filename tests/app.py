@@ -5,7 +5,7 @@ import logging
 
 from roid import SlashCommands, Embed, CommandType, Interaction
 from roid.components import ButtonStyle, InvokeContext
-from roid.objects import MemberPermissions
+from roid.objects import MemberPermissions, ResponseType
 from roid.helpers import require_user_permissions, hyperlink
 from roid.response import Response
 
@@ -27,7 +27,7 @@ class TestAnimal(Enum):
 @app.command(
     "say-hello", "oofies", type=CommandType.CHAT_INPUT, guild_id=675647130647658527
 )
-async def test(interaction: Interaction):
+async def test():
     resp = Response(
         embed=Embed(title=f"Hello, world", color=0xFFFFF),
         components=[
@@ -46,13 +46,14 @@ async def test(interaction: Interaction):
 
 @app.button(
     style=ButtonStyle.PRIMARY,
-    label="Click me",
+    label="Delete",
     emoji="<:CrunchyRollLogo:676087821596885013>",
     oneshot=True,
 )
 async def test_button_click(ctx: InvokeContext):
-    print("done!")
-    await ctx.purge()
+    # The button click will be reject next time someone clicks it
+    await ctx.destroy()
+    return Response()
 
 
 #

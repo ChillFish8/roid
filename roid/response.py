@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import uuid
-from enum import IntEnum
 from typing import List, Optional, Dict, Any, Union, TYPE_CHECKING
 
 from pydantic import BaseModel, constr, validate_arguments
@@ -13,19 +12,7 @@ if TYPE_CHECKING:
 
 from roid.deferred import DeferredComponent
 from roid.components import Component, ActionRow
-from roid.objects import Embed, AllowedMentions
-
-
-class ResponseType(IntEnum):
-    PONG = 1
-    CHANNEL_MESSAGE_WITH_SOURCE = 4
-    DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE = 5
-    DEFERRED_UPDATE_MESSAGE = 6
-    UPDATE_MESSAGE = 7
-
-
-class ResponseFlags(IntEnum):
-    EPHEMERAL = 1 << 6
+from roid.objects import Embed, AllowedMentions, ResponseType
 
 
 class ResponseData(BaseModel):
@@ -141,12 +128,23 @@ class Response:
             embeds=embeds if embeds else None,
             content=content,
             components=components,
-            component_context=component_context,
+            component_context=component_context or {},
+        )
+
+    @property
+    def is_empty(self) -> bool:
+        return not (
+            bool(self._payload.content)
+            or bool(self._payload.embeds)
+            or bool(self._payload.components)
         )
 
     async def into_response_payload(
         self, app: SlashCommands, default_type: ResponseType
     ):
+        if self.is_empty:
+            return ResponsePayload(type=ResponseType.DEFERRED_UPDATE_MESSAGE)
+
         if self._payload.components is None:
             return ResponsePayload(
                 type=ResponseType.CHANNEL_MESSAGE_WITH_SOURCE, data=self._payload

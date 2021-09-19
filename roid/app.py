@@ -219,14 +219,14 @@ class SlashCommands(FastAPI):
             interaction = Interaction(**data)
         except ValidationError as e:
             _log.warning(f"rejecting response due to {e!r}")
-            return HTTPException(status_code=422, detail=e.errors())
+            raise HTTPException(status_code=422, detail=e.errors())
 
         if interaction.type == InteractionType.PING:
             return {"type": ResponseType.PONG}
         elif interaction.type == InteractionType.APPLICATION_COMMAND:
             cmd = self._commands.get(interaction.data.name)
             if cmd is None:
-                return HTTPException(status_code=400, detail="No command found")
+                raise HTTPException(status_code=400, detail="No command found")
 
             DEFAULT_RESPONSE_TYPE = ResponseType.CHANNEL_MESSAGE_WITH_SOURCE
             return await self._invoke_with_handlers(
@@ -235,13 +235,14 @@ class SlashCommands(FastAPI):
 
         elif interaction.type == InteractionType.MESSAGE_COMPONENT:
             if interaction.data.custom_id is None:
-                return HTTPException(status_code=400)
+                raise HTTPException(status_code=400)
 
             custom_id, *_ = interaction.data.custom_id.split(":", maxsplit=1)
 
             component = self._components.get(custom_id)
+            print(component)
             if component is None:
-                return HTTPException(status_code=400, detail="No component found")
+                raise HTTPException(status_code=400, detail="No component found")
 
             DEFAULT_RESPONSE_TYPE = ResponseType.UPDATE_MESSAGE
             return await self._invoke_with_handlers(
@@ -466,12 +467,13 @@ class SlashCommands(FastAPI):
                 oneshot=oneshot,
             )
 
-            if custom_id in self._components:
-                raise ComponentAlreadyExists(
-                    f"component with custom_id {custom_id!r} has already been defined and registered"
-                )
+            if url is not None:
+                if custom_id in self._components:
+                    raise ComponentAlreadyExists(
+                        f"component with custom_id {custom_id!r} has already been defined and registered"
+                    )
 
-            self._components[custom_id] = component
+                self._components[custom_id] = component
             return component
 
         return wrapper

@@ -2,10 +2,9 @@ from __future__ import annotations
 
 from functools import reduce
 from operator import or_
-from typing import Optional, Union, List, Callable, TYPE_CHECKING
+from typing import Optional, Union, List, Callable
 
 from pydantic import validate_arguments
-
 
 from roid.checks import (
     SyncOrAsyncCheckError,
