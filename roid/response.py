@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from roid.app import SlashCommands
 
 from roid.deferred import DeferredComponent
-from roid.components import Component, ActionRow
+from roid.components import Component, ActionRow, ComponentType, ComponentContext
 from roid.objects import Embed, AllowedMentions, ResponseType, ResponseFlags
 
 
@@ -70,7 +70,15 @@ class Response:
         allowed_mentions: AllowedMentions = None,
         flags: int = None,
         tts: bool = False,
-        components: Optional[List[List[Union[Component, DeferredComponent]]]] = None,
+        components: Optional[
+            List[
+                Union[
+                    List[Union[Component, DeferredComponent]],
+                    DeferredComponent,
+                    Component,
+                ],
+            ]
+        ] = None,
         component_context: Optional[Dict[str, Any]] = None,
         response_type: Optional[ResponseType] = None,
         delete_parent: bool = False,
@@ -152,7 +160,7 @@ class Response:
         app: SlashCommands,
         default_type: ResponseType,
         parent_interaction: Optional[Interaction] = None,
-    ):
+    ) -> ResponsePayload:
         if self.delete_parent and self.is_empty:
             self._payload.content = "Deleted parent."
             self._payload.flags = ResponseFlags.EPHEMERAL
@@ -166,42 +174,107 @@ class Response:
                 type=ResponseType.CHANNEL_MESSAGE_WITH_SOURCE, data=self._payload
             )
 
-        state = app.state[COMMAND_STATE_TARGET]
-
-        action_rows = []
         components = self._payload.components
+        if len(components) > 5:
+            raise ValueError(
+                f"there can only be a maximum of 5 "
+                f"action rows got {len(components)} rows."
+            )
+
+        state = app.state[COMMAND_STATE_TARGET]
+        action_rows: List[ActionRow] = []
         for block in components:
             component_block = []
-            for c in block:
-                if not isinstance(c, (Component, DeferredComponent)):
-                    raise TypeError(
-                        f"invalid component given, expected type "
-                        f"`Component` or `DeferredComponent` got {type(c)!r}"
-                    )
+            try:
+                # Now this is kind of hacky but we have to unset any temporary blocks
+                # as well as the processed action blocks. So we keep a reference to
+                # the temporary.
+                row = await self.process_block(
+                    app, block, parent_interaction, component_block
+                )
+            except Exception as e:
+                # We have to undo all out changes on the cache to stop leaks.
+                for row in action_rows:
+                    for c in row.components:
+                        if c.custom_id is None:
+                            continue
+                        await state.remove(c.custom_id)
 
-                if isinstance(c, DeferredComponent):
-                    c = c(app=app)
+                for c in component_block:
+                    if c.custom_id is None:
+                        continue
+                    await state.remove(c.custom_id)
+                raise e from None
 
-                data = c.data.copy()
-
-                # If its got a url we wont get invoked on a click
-                # so we can ignore setting a reference id.
-                if data.url is None:
-                    reference_id = str(uuid.uuid4())
-                    data.custom_id = f"{data.custom_id}:{reference_id}"
-                    await state.set(
-                        reference_id,
-                        {
-                            "parent": parent_interaction,
-                            **self._payload.component_context,
-                        },
-                    )
-
-                component_block.append(data)
-            action_row = ActionRow(components=component_block)
-            action_rows.append(action_row)
+            action_rows.append(row)
 
         resp = self._payload.dict()
         del resp["components"]
         data = ResponseData(**resp, components=action_rows)
         return ResponsePayload(type=self._response_type or default_type, data=data)
+
+    async def process_block(
+        self,
+        app: SlashCommands,
+        block: Any,
+        parent: Optional[Interaction],
+        component_block: List[ComponentContext],
+    ) -> ActionRow:
+        state = app.state[COMMAND_STATE_TARGET]
+
+        if isinstance(block, (Component, DeferredComponent)):
+            if isinstance(block, DeferredComponent):
+                block = block(app=app)
+
+            data = block.data.copy()
+
+            # If its got a url we wont get invoked on a click
+            # so we can ignore setting a reference id.
+            if data.url is None:
+                reference_id = str(uuid.uuid4())
+                data.custom_id = f"{data.custom_id}:{reference_id}"
+                await state.set(
+                    reference_id,
+                    {
+                        "parent": parent,
+                        **self._payload.component_context,
+                    },
+                    ttl=self._payload.component_context.get("ttl"),
+                )
+
+            return ActionRow(components=[data])
+
+        for c in block:
+            if not isinstance(c, (Component, DeferredComponent)):
+                raise TypeError(
+                    f"invalid component given, expected type "
+                    f"`Component` or `DeferredComponent` got {type(c)!r}"
+                )
+
+            if isinstance(c, DeferredComponent):
+                c = c(app=app)
+
+            data = c.data.copy()
+
+            if data.type == ComponentType.SELECT_MENU and len(component_block) > 0:
+                raise ValueError(
+                    f"select menus must be on their own action row / "
+                    f"not in a nested list. Components on row: {component_block!r}"
+                )
+
+            # If its got a url we wont get invoked on a click
+            # so we can ignore setting a reference id.
+            if data.url is None:
+                reference_id = str(uuid.uuid4())
+                data.custom_id = f"{data.custom_id}:{reference_id}"
+                await state.set(
+                    reference_id,
+                    {
+                        "parent": parent,
+                        **self._payload.component_context,
+                    },
+                    ttl=self._payload.component_context.get("ttl"),
+                )
+
+            component_block.append(data)
+        return ActionRow(components=component_block)
