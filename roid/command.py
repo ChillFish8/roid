@@ -458,7 +458,6 @@ class Command(OptionalAsyncCallable):
         resp = response.dict()
         del resp["components"]
         data = ResponseData(**resp, components=action_rows)
-
         return ResponsePayload(type=ResponseType.CHANNEL_MESSAGE_WITH_SOURCE, data=data)
 
     def error(

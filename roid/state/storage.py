@@ -198,7 +198,7 @@ class _SqliteRunner:
     def _get(self, db: sqlite3.Connection, key: str) -> Optional[bytes]:
         cur = db.cursor()
         cur.execute(
-            "SELECT (store_value, delete_after) FROM store WHERE key = ? LIMIT 1",
+            "SELECT (store_value, delete_after) FROM store WHERE key = ?",
             (key,),
         )
         v = cur.fetchone()

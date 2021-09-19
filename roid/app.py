@@ -380,11 +380,11 @@ class SlashCommands(FastAPI):
             animated, name, id_ = emoji
             emoji = PartialEmoji(id=id_, name=name, animated=bool(animated))
 
-        if url is not None:
-            custom_id = None
-
         if custom_id is None:
             custom_id = str(uuid.uuid4())
+
+        if url is not None:
+            custom_id = None
 
         def wrapper(func):
             component = Component(
