@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
+import functools
 from enum import IntEnum, auto
-from typing import Optional, Union, List, Callable, Any, Coroutine, TYPE_CHECKING
+from typing import Optional, Union, List, Callable, Any, Coroutine, TYPE_CHECKING, Tuple
 from pydantic import BaseModel, conint, AnyHttpUrl, constr
 
 from roid.exceptions import InvalidComponent, AbortInvoke
@@ -13,7 +15,7 @@ from roid.state import PrefixedState
 if TYPE_CHECKING:
     from roid.interactions import Interaction
     from roid.app import SlashCommands
-    from roid.response import ResponsePayload
+    from roid.response import ResponsePayload, Response
 
     SyncOrAsyncCallable = Callable[
         [
@@ -154,7 +156,31 @@ class Component(OptionalAsyncCallable):
     def __hash__(self):
         return hash(self._ctx.custom_id)
 
-    async def _get_kwargs(self, interaction: Interaction) -> dict:
+    async def __call__(self, interaction: Interaction) -> Any:
+        try:
+            resp, parent = await self._invoke(interaction)
+        except Exception as e:
+            if self._on_error is None:
+                raise e from None
+            resp, parent = await self._invoke_error_handler(interaction, e)
+
+        if resp.delete_parent and (parent is not None):
+            await self.app._http.delete_interaction_message(parent.token)
+        return resp
+
+    async def _invoke(self, interaction: Interaction) -> Tuple[Response, Interaction]:
+        kwargs, parent = await self._get_kwargs(interaction)
+
+        if self._callback_is_coro:
+            return await self._callback(**kwargs), parent
+
+        partial = functools.partial(self._callback, **kwargs)
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, partial), parent
+
+    async def _get_kwargs(
+        self, interaction: Interaction
+    ) -> Tuple[dict, Optional[Interaction]]:
         _, *reference_id = interaction.data.custom_id.split(":", maxsplit=1)
 
         if len(reference_id) == 0:
@@ -162,6 +188,7 @@ class Component(OptionalAsyncCallable):
         else:
             reference_id = reference_id[0]
 
+        ctx = None
         kwargs = {}
         if self._pass_context_to is not None:
             state = self.app.state[COMMAND_STATE_TARGET]
@@ -181,4 +208,4 @@ class Component(OptionalAsyncCallable):
                 if self._oneshot:
                     await state.remove(reference_id)
 
-        return kwargs
+        return kwargs, ctx and ctx.get("parent")

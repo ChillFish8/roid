@@ -8,11 +8,12 @@ from pydantic import BaseModel, constr, validate_arguments
 from roid.state import COMMAND_STATE_TARGET
 
 if TYPE_CHECKING:
+    from roid import Interaction
     from roid.app import SlashCommands
 
 from roid.deferred import DeferredComponent
 from roid.components import Component, ActionRow
-from roid.objects import Embed, AllowedMentions, ResponseType
+from roid.objects import Embed, AllowedMentions, ResponseType, ResponseFlags
 
 
 class ResponseData(BaseModel):
@@ -72,6 +73,7 @@ class Response:
         components: Optional[List[List[Union[Component, DeferredComponent]]]] = None,
         component_context: Optional[Dict[str, Any]] = None,
         response_type: Optional[ResponseType] = None,
+        delete_parent: bool = False,
     ):
         """
         A response to the given interaction.
@@ -111,6 +113,10 @@ class Response:
                 ignore the above warning however, you will need to to change the code
                 base if you later plan to use multi processing.
 
+            delete_parent:
+                Whether or not to delete the parent interaction or not.
+                If set to True the parent will be deleted.
+
         Returns:
             A `ResponsePayload` object.
         """
@@ -120,6 +126,8 @@ class Response:
         if embed is not None:
             embeds.append(embed)
 
+        self.delete_parent = delete_parent
+        self.parent: Optional[Interaction] = None
         self._response_type = response_type
         self._payload = DeferredResponsePayload(
             tts=tts,
@@ -140,8 +148,16 @@ class Response:
         )
 
     async def into_response_payload(
-        self, app: SlashCommands, default_type: ResponseType
+        self,
+        app: SlashCommands,
+        default_type: ResponseType,
+        parent_interaction: Optional[Interaction] = None,
     ):
+        if self.delete_parent and self.is_empty:
+            self._payload.content = "Deleted parent."
+            self._payload.flags = ResponseFlags.EPHEMERAL
+            return ResponsePayload(type=ResponseType.CHANNEL_MESSAGE_WITH_SOURCE)
+
         if self.is_empty:
             return ResponsePayload(type=ResponseType.DEFERRED_UPDATE_MESSAGE)
 
@@ -173,7 +189,13 @@ class Response:
                 if data.url is None:
                     reference_id = str(uuid.uuid4())
                     data.custom_id = f"{data.custom_id}:{reference_id}"
-                    await state.set(reference_id, self._payload.component_context)
+                    await state.set(
+                        reference_id,
+                        {
+                            "parent": parent_interaction,
+                            **self._payload.component_context,
+                        },
+                    )
 
                 component_block.append(c.data)
             action_row = ActionRow(components=component_block)

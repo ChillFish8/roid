@@ -3,9 +3,9 @@ from enum import Enum
 import uvicorn
 import logging
 
-from roid import SlashCommands, Embed, CommandType, Interaction
+from roid import SlashCommands, Embed, CommandType
 from roid.components import ButtonStyle, InvokeContext
-from roid.objects import MemberPermissions, ResponseType
+from roid.objects import MemberPermissions
 from roid.helpers import require_user_permissions, hyperlink
 from roid.response import Response
 
@@ -53,7 +53,9 @@ async def test():
 async def test_button_click(ctx: InvokeContext):
     # The button click will be reject next time someone clicks it
     await ctx.destroy()
-    return Response()
+
+    # An empty response or None results in the parent message not being touched.
+    return Response(delete_parent=True)
 
 
 #

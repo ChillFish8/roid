@@ -68,7 +68,8 @@ class HttpHandler:
 
         self.application_id = application_id
         self.__token = token
-        self._primary_route = f"https://{DISCORD_DOMAIN}/api/{self.API_VERSION}/applications/{application_id}"
+        self._primary_route = f"https://{DISCORD_DOMAIN}/api/{self.API_VERSION}"
+        self._application_route = f"{self._primary_route}/applications/{application_id}"
 
     async def shutdown(self):
         await self.client.aclose()
@@ -95,6 +96,13 @@ class HttpHandler:
     async def get_global_commands(self) -> List[dict]:
         return await self.request("GET", "/commands")
 
+    async def delete_interaction_message(self, interaction_token: str):
+        return await self.request(
+            "DELETE",
+            f"/webhooks/{self.application_id}/{interaction_token}/messages/@original",
+            primary_route_only=True,
+        )
+
     async def request(self, method: str, section: str, headers: dict = None, **extra):
         set_headers = {
             "Authorization": f"Bot {self.__token}",
@@ -104,11 +112,16 @@ class HttpHandler:
         if headers is not None:
             set_headers = {**headers, **set_headers}
 
-        url = f"{self._primary_route}{section}"
+        if extra.pop("primary_route_only", False):
+            url = f"{self._primary_route}{section}"
+        else:
+            url = f"{self._application_route}{section}"
 
         await self.lock.acquire()
         with MaybeUnlock(self.lock) as lock:
+            r = None
             for tries in range(5):
+                print(tries)
                 try:
                     r = await self.client.request(
                         method, url, headers=set_headers, **extra
@@ -188,7 +201,8 @@ class HttpHandler:
                         continue
                     raise
                 finally:
-                    await r.aclose()
+                    if r is not None:
+                        await r.aclose()
 
             if r is not None:
                 # We've run out of retries, raise.

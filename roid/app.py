@@ -230,7 +230,7 @@ class SlashCommands(FastAPI):
 
             DEFAULT_RESPONSE_TYPE = ResponseType.CHANNEL_MESSAGE_WITH_SOURCE
             return await self._invoke_with_handlers(
-                cmd, interaction, DEFAULT_RESPONSE_TYPE
+                cmd, interaction, DEFAULT_RESPONSE_TYPE, pass_parent=True
             )
 
         elif interaction.type == InteractionType.MESSAGE_COMPONENT:
@@ -255,6 +255,7 @@ class SlashCommands(FastAPI):
         callback,
         interaction: Interaction,
         default_response_type: ResponseType,
+        pass_parent: bool = False,
     ) -> ResponsePayload:
         try:
             resp = await callback(interaction)
@@ -264,17 +265,23 @@ class SlashCommands(FastAPI):
                 raise e from None
             resp = handler(e)
 
-        return await self.process_response(default_response_type, resp)
+        args = [default_response_type, resp]
+        if pass_parent:
+            args.append(interaction)
+
+        return await self.process_response(*args)
 
     @validate_arguments(config={"arbitrary_types_allowed": True})
     async def process_response(
         self,
         default_response_type: ResponseType,
         response: Union[
+            None,
             ResponsePayload,
             Response,
             ResponseData,
         ],
+        parent_interaction: Optional[Interaction] = None,
     ) -> ResponsePayload:
         """
         Converts any of the possible response types into a ResponsePayload.
@@ -286,20 +293,32 @@ class SlashCommands(FastAPI):
             default_response_type:
                 The default ResponseType to use if the Response object / data
                 has not been set one.
+
             response:
                 A given instance of the possible response types to process and
                 convert.
 
+            parent_interaction:
+                The interaction a given component belongs to.
         Returns:
             A ResponsePayload instance that has had all deferred components
             resolved.
         """
+        if response is None:
+            return await Response().into_response_payload(
+                app=self,
+                default_type=default_response_type,
+                parent_interaction=parent_interaction,
+            )
+
         if isinstance(response, ResponsePayload):
             return response
 
         if isinstance(response, Response):
             return await response.into_response_payload(
-                app=self, default_type=default_response_type
+                app=self,
+                default_type=default_response_type,
+                parent_interaction=parent_interaction,
             )
         elif isinstance(response, ResponseData):
             return ResponsePayload(type=default_response_type, data=response)
