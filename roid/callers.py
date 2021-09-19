@@ -15,8 +15,12 @@ class OptionalAsyncCallable:
         self,
         callback: Callable[..., Union[Any, Coroutine[Any, Any, Any]]],
         on_error: Optional[Callable[..., Union[Any, Coroutine[Any, Any, Any]]]] = None,
+        *,
+        callback_is_async: bool = False
     ):
-        self._callback_is_coro = asyncio.iscoroutinefunction(callback)
+        self._callback_is_coro = callback_is_async or asyncio.iscoroutinefunction(
+            callback
+        )
         self._callback = callback
 
         if on_error is not None:

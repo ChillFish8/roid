@@ -43,7 +43,7 @@ class SlashCommands(FastAPI):
         application_id: int,
         application_public_key: str,
         token: str,
-        register_commands: bool = True,
+        register_commands: bool = False,
         state_backend: Optional[StorageBackend] = None,
         **extra,
     ):
@@ -332,7 +332,9 @@ class SlashCommands(FastAPI):
         style: ButtonStyle,
         *,
         custom_id: Optional[
-            constr(strip_whitespace=True, regex="a-zA-Z0-9", min_length=1)
+            constr(
+                strip_whitespace=True, regex="a-zA-Z0-9", min_length=1, max_length=32
+            )
         ] = None,
         disabled: bool = False,
         emoji: constr(strip_whitespace=True, regex=EMOJI_REGEX) = None,
@@ -377,6 +379,9 @@ class SlashCommands(FastAPI):
             emoji = re.findall(EMOJI_REGEX, emoji)[0]
             animated, name, id_ = emoji
             emoji = PartialEmoji(id=id_, name=name, animated=bool(animated))
+
+        if url is not None:
+            custom_id = None
 
         if custom_id is None:
             custom_id = str(uuid.uuid4())

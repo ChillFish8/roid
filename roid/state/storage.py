@@ -190,7 +190,7 @@ class _SqliteRunner:
 
         cur = db.cursor()
         cur.execute(
-            "INSERT INTO store (key, store_value, delete_after) VALUES (?, ?)",
+            "INSERT INTO store (key, store_value, delete_after) VALUES (?, ?, ?)",
             (key, value, ttl),
         )
         cur.close()

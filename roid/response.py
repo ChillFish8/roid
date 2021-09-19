@@ -1,8 +1,9 @@
 from enum import IntEnum
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 
-from pydantic import BaseModel, constr, validate_arguments, validator
+from pydantic import BaseModel, constr, validate_arguments
 
+from roid.deferred import DeferredComponent
 from roid.components import Component, ActionRow
 from roid.objects import Embed, AllowedMentions
 
@@ -44,6 +45,13 @@ class ResponseData(BaseModel):
         return super().dict(exclude=exclude, **kwargs)
 
 
+class DeferredResponsePayload(ResponseData):
+    components: Optional[List[List[Union[Component, DeferredComponent]]]]
+
+    class Config:
+        arbitrary_types_allowed = True
+
+
 class ResponsePayload(BaseModel):
     type: ResponseType
     data: Optional[ResponseData] = None
@@ -58,9 +66,9 @@ def response(
     allowed_mentions: AllowedMentions = None,
     flags: int = None,
     tts: bool = False,
-    components: Optional[List[List[Component]]] = None,
+    components: Optional[List[List[Union[Component, DeferredComponent]]]] = None,
     component_context: Optional[Dict[str, Any]] = None,
-) -> ResponsePayload:
+) -> DeferredResponsePayload:
     """
     A response to the given interaction.
     You need to pass an embed, embeds, content or a mixture of the 3.
@@ -108,28 +116,12 @@ def response(
     if embed is not None:
         embeds.append(embed)
 
-    action_rows = []
-    if components is not None:
-        for block in components:
-            component_block = []
-            for c in block:
-                if not isinstance(c, Component):
-                    raise TypeError(
-                        f"invalid component given, expected type `Component` got {type(c)!r}"
-                    )
-
-                component_block.append(c.data)
-            action_row = ActionRow(components=component_block)
-            action_rows.append(action_row)
-
-    data = ResponseData(
+    return DeferredResponsePayload(
         tts=tts,
         allowed_mentions=allowed_mentions,
         flags=flags,
         embeds=embeds if embeds else None,
         content=content,
-        components=components and action_rows,
+        components=components,
         component_context=component_context,
     )
-
-    return ResponsePayload(type=ResponseType.CHANNEL_MESSAGE_WITH_SOURCE, data=data)

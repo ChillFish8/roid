@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pprint
 import uuid
 import inspect
 import typing
@@ -19,6 +20,9 @@ from typing import (
 )
 from pydantic import BaseModel, constr, validate_arguments
 
+from roid.components import Component, ActionRow
+from roid.deferred import DeferredComponent
+
 if TYPE_CHECKING:
     from roid.app import SlashCommands
 
@@ -33,7 +37,12 @@ from roid.interactions import (
 from roid.objects import Role, Channel, Member, PartialMessage, User
 from roid.extractors import extract_options
 from roid.checks import CommandCheck
-from roid.response import ResponsePayload
+from roid.response import (
+    ResponsePayload,
+    DeferredResponsePayload,
+    ResponseType,
+    ResponseData,
+)
 from roid.state import COMMAND_STATE_TARGET
 from roid.callers import OptionalAsyncCallable
 
@@ -215,6 +224,7 @@ class Command(OptionalAsyncCallable):
         super().__init__(
             callback=validate_arguments(callback),
             on_error=default_on_error,
+            callback_is_async=True,  # override to prevent validate_arguments issue.
         )
 
         self.app = app
@@ -402,27 +412,54 @@ class Command(OptionalAsyncCallable):
 
         response = await self._invoke(interaction)
 
-        if response.data.components is None:
+        if isinstance(response, ResponsePayload):
             return response
+
+        if not isinstance(response, (DeferredResponsePayload, ResponseData)):
+            raise TypeError(
+                f"expected either: {ResponsePayload!r}, "
+                f"{ResponseData!r} or {DeferredResponsePayload!r} return type."
+            )
+
+        if response.components is None:
+            return ResponsePayload(
+                type=ResponseType.CHANNEL_MESSAGE_WITH_SOURCE, data=response
+            )
 
         state = self.app.state[COMMAND_STATE_TARGET]
 
-        # We got along and update each button with a unique id in order
-        # to pass the given context to each one.
-        for row_i in range(len(response.data.components)):
-            for component_i in range(len(response.data.components[row_i].components)):
-                reference_id = str(uuid.uuid4())
-                await state.set(reference_id, response.data.component_context)
-                component = response.data.components[row_i].components[component_i]
+        action_rows = []
+        components = response.components
+        for block in components:
+            component_block = []
+            for c in block:
+                if not isinstance(c, (Component, DeferredComponent)):
+                    raise TypeError(
+                        f"invalid component given, expected type "
+                        f"`Component` or `DeferredComponent` got {type(c)!r}"
+                    )
 
-                if component.url is not None:
-                    continue
+                if isinstance(c, DeferredComponent):
+                    c = c(app=self.app)
 
-                response.data.components[row_i].components[
-                    component_i
-                ].custom_id = f"{component.custom_id}:{reference_id}"
+                data = c.data
 
-        return response
+                # If its got a url we wont get invoked on a click
+                # so we can ignore setting a reference id.
+                if data.url is None:
+                    reference_id = str(uuid.uuid4())
+                    data.custom_id = f"{data.custom_id}:{reference_id}"
+                    await state.set(reference_id, response.component_context)
+
+                component_block.append(c.data)
+            action_row = ActionRow(components=component_block)
+            action_rows.append(action_row)
+
+        resp = response.dict()
+        del resp["components"]
+        data = ResponseData(**resp, components=action_rows)
+
+        return ResponsePayload(type=ResponseType.CHANNEL_MESSAGE_WITH_SOURCE, data=data)
 
     def error(
         self,

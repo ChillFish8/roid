@@ -6,8 +6,6 @@ from typing import Optional, Union, List, Callable, TYPE_CHECKING
 
 from pydantic import validate_arguments
 
-if TYPE_CHECKING:
-    from roid.app import SlashCommands
 
 from roid.checks import (
     SyncOrAsyncCheckError,
@@ -20,31 +18,11 @@ from roid.components import ButtonStyle
 from roid.objects import MemberPermissions
 from roid.response import ResponsePayload
 from roid.interactions import Interaction
+from roid.deferred import DeferredButton
 
 
 def _null():
     pass
-
-
-class DeferredAppItem:
-    def __init__(
-        self,
-        target_name: str,
-        call_pipeline: List[Union[dict, list]],
-    ):
-        self._target_name = target_name
-        self._call_pipeline = call_pipeline
-
-    def __call__(self, app: SlashCommands):
-        caller = getattr(app, self._target_name)
-
-        for params in self._call_pipeline:
-            if isinstance(params, dict):
-                caller = caller(**params)
-            else:
-                caller = caller(*params)
-
-        return caller
 
 
 @validate_arguments
@@ -71,8 +49,7 @@ def hyperlink(
             If the button should be disabled or not. (If it can be clicked or not.)
     """
 
-    return DeferredAppItem(
-        "button",
+    return DeferredButton(
         call_pipeline=[
             dict(
                 style=ButtonStyle.Link,
@@ -102,7 +79,7 @@ def check(cb: SyncOrAsyncCheck, on_reject: Optional[SyncOrAsyncCheckError] = Non
 
     """
 
-    def wrapper(func: Command) -> SyncOrAsyncCheck:
+    def wrapper(func: Command) -> Command:
         if not isinstance(func, Command):
             raise TypeError(
                 f"cannot add check to {func!r}, "
