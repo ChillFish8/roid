@@ -1,4 +1,6 @@
 import asyncio
+from datetime import datetime, timedelta
+
 import aioredis
 import threading
 import queue
@@ -8,7 +10,7 @@ from typing import Optional
 
 
 class StorageBackend:
-    async def store(self, key: str, value: bytes):
+    async def store(self, key: str, value: bytes, ttl: Optional[timedelta]):
         """
         Stores a given key with it's serialized value.
 
@@ -24,6 +26,17 @@ class StorageBackend:
 
         returns:
             The bytes associated with the given key otherwise None is returned.
+        """
+
+        raise NotImplemented()
+
+    async def remove(self, key: str):
+        """
+        Removes the value for the given key from the collection if it exists.
+
+        Args:
+            key:
+                The unique key to remove.
         """
 
         raise NotImplemented()
@@ -65,11 +78,14 @@ class RedisBackend(StorageBackend):
             **extra,
         )
 
-    async def store(self, key: str, value: bytes):
-        await self._redis.set(key, value)
+    async def store(self, key: str, value: bytes, ttl: Optional[timedelta]):
+        await self._redis.set(key, value, ex=ttl)
 
     async def get(self, key: str) -> Optional[bytes]:  # noqa
         await self._redis.get(key)
+
+    async def remove(self, key: str):
+        await self._redis.delete(key)
 
     async def shutdown(self):
         await self._redis.close()
@@ -82,13 +98,18 @@ class SqliteBackend(StorageBackend):
     async def shutdown(self):
         self._runner.shutdown()  # noqa
 
-    async def store(self, key: str, value: bytes):
-        op = _SqliteOp("SET", {"key": key, "value": value})
+    async def store(self, key: str, value: bytes, ttl: Optional[timedelta]):
+        op = _SqliteOp("SET", {"key": key, "value": value, "ttl": ttl})
         self._runner.submit(op)
         return await op.wait()
 
     async def get(self, key: str) -> Optional[bytes]:  # noqa
         op = _SqliteOp("GET", {"key": key})
+        self._runner.submit(op)
+        return await op.wait()
+
+    async def remove(self, key: str):
+        op = _SqliteOp("DEL", {"key": key})
         self._runner.submit(op)
         return await op.wait()
 
@@ -130,7 +151,8 @@ class _SqliteRunner:
             """
             CREATE TABLE IF NOT EXISTS store (
                 key TEXT PRIMARY KEY,
-                store_value BLOB
+                store_value BLOB,
+                delete_after DOUBLE PRECISION
             )           
         """
         )
@@ -144,21 +166,50 @@ class _SqliteRunner:
             elif event.action == "GET":
                 result = self._get(db, **event.data)
                 event.set_result(result)
+            elif event.action == "DEL":
+                self._delete(db, **event.data)
+                event.set_result(None)
             else:
                 raise Exception(f"Unknown action {event.action!r}")
 
     @staticmethod
-    def _set(db: sqlite3.Connection, key: str, value: Optional[bytes]):
+    def _delete(db: sqlite3.Connection, key: str):
         cur = db.cursor()
-        cur.execute("INSERT INTO store (key, store_value) VALUES (?, ?)", (key, value))
+        cur.execute("DELETE FROM store WHERE key = ?", (key,))
         cur.close()
 
     @staticmethod
-    def _get(db: sqlite3.Connection, key: str) -> Optional[bytes]:
+    def _set(
+        db: sqlite3.Connection,
+        key: str,
+        value: Optional[bytes],
+        ttl: Optional[timedelta],
+    ):
+        if ttl is not None:
+            ttl = (datetime.utcnow() + ttl).timestamp()
+
         cur = db.cursor()
         cur.execute(
-            "SELECT (key, store_value) FROM store WHERE key = ? LIMIT 1", (key,)
+            "INSERT INTO store (key, store_value, delete_after) VALUES (?, ?)",
+            (key, value, ttl),
+        )
+        cur.close()
+
+    def _get(self, db: sqlite3.Connection, key: str) -> Optional[bytes]:
+        cur = db.cursor()
+        cur.execute(
+            "SELECT (store_value, delete_after) FROM store WHERE key = ? LIMIT 1",
+            (key,),
         )
         v = cur.fetchone()
         cur.close()
-        return v
+
+        if v is None:
+            return None
+
+        delete_after = v[1]
+        if delete_after is not None:
+            if datetime.utcnow() > datetime.utcfromtimestamp(delete_after):
+                self._delete(db, key)
+                return None
+        return v[0]

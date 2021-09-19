@@ -1,7 +1,8 @@
 import asyncio
 import pickle
+from datetime import timedelta
 
-from typing import Any, Dict
+from typing import Any, Dict, Coroutine, Optional, Union
 
 from roid.state.storage import StorageBackend
 
@@ -13,30 +14,39 @@ class State:
         self._loop = asyncio.get_running_loop()
         self._backend = backend
 
-    async def set(self, key: str, value: Any):
+    async def set(
+        self, key: str, value: Any, ttl: Optional[Union[timedelta, float]] = None
+    ):
         """
         Sets a key to a given value.
 
-        args:
+        Args:
             key:
                 The unique key for the value.
 
             value:
                 The value for the given key, this must be serializable by pickle.
+
+            ttl:
+                The time-to-live for the given value. If set to None this will never
+                be deleted automatically.
         """
 
+        if ttl is not None and isinstance(ttl, float):
+            ttl = timedelta(seconds=ttl)
+
         data = pickle.dumps(value)
-        await self._backend.store(key, data)
+        await self._backend.store(key, data, ttl)
 
     async def get(self, key: str) -> Any:
         """
         Gets a value for a given key.
 
-        args:
+        Args:
             key:
                 The unique key for the value.
 
-        returns:
+        Returns:
             The value associated with this key or None.
         """
 
@@ -46,34 +56,66 @@ class State:
 
         return pickle.loads(data)
 
-    def set_sync(self, key: str, value: Any):
+    async def remove(self, key: str):
+        """
+        Removes the value for the given key from the collection if it exists.
+
+        Args:
+            key:
+                The unique key to remove.
+        """
+
+        return await self._backend.remove(key)
+
+    def set_sync(
+        self, key: str, value: Any, ttl: Optional[Union[timedelta, float]] = None
+    ):
         """
         Sets a key to a given value.
 
-        args:
+        Args:
             key:
                 The unique key for the value.
 
             value:
                 The value for the given key, this must be serializable by pickle.
+
+            ttl:
+                The time-to-live for the given value. If set to None this will never
+                be deleted automatically.
         """
 
-        fut = asyncio.run_coroutine_threadsafe(self.set(key, value), self._loop)
+        if ttl is not None and isinstance(ttl, float):
+            ttl = timedelta(seconds=ttl)
+
+        fut = asyncio.run_coroutine_threadsafe(self.set(key, value, ttl), self._loop)
         return fut.result()
 
-    def get_sync(self, key: str):
+    def get_sync(self, key: str) -> Any:
         """
         Gets a value for a given key.
 
-        args:
+        Args:
             key:
                 The unique key for the value.
 
-        returns:
+        Returns:
             The value associated with this key or None.
         """
 
         fut = asyncio.run_coroutine_threadsafe(self.get(key), self._loop)
+        return fut.result()
+
+    def remove_sync(self, key: str):
+        """
+        Remove a key from the state.
+
+        Args:
+            key:
+                The unique key to remove.
+        """
+
+        fut = asyncio.run_coroutine_threadsafe(self.remove(key), self._loop)
         return fut.result()
 
 
@@ -97,61 +139,25 @@ class PrefixedState(State):
 
         super().__init__(backend)
 
-    def set(self, key: str, value: Any):
-        """
-        Sets a key to a given value.
+    def set(self, key: str, value: Any, ttl: Optional[Union[timedelta, float]] = None):
+        return super().set(f"{self.prefix}:{key}", value, ttl)
 
-        args:
-            key:
-                The unique key for the value.
-
-            value:
-                The value for the given key, this must be serializable by pickle.
-        """
-
-        return super().set(f"{self.prefix}:{key}", value)
-
-    async def get(self, key: str) -> Any:
-        """
-        Gets a value for a given key.
-
-        args:
-            key:
-                The unique key for the value.
-
-        returns:
-            The value associated with this key or None.
-        """
-
+    def get(self, key: str) -> Coroutine[Any, Any, Any]:
         return super().get(f"{self.prefix}:{key}")
 
-    def set_sync(self, key: str, value: Any):
-        """
-        Sets a key to a given value.
+    def remove(self, key: str):
+        return super().remove(f"{self.prefix}:{key}")
 
-        args:
-            key:
-                The unique key for the value.
-
-            value:
-                The value for the given key, this must be serializable by pickle.
-        """
-
-        return super().set_sync(f"{self.prefix}:{key}", value)
+    def set_sync(
+        self, key: str, value: Any, ttl: Optional[Union[timedelta, float]] = None
+    ):
+        return super().set_sync(f"{self.prefix}:{key}", value, ttl)
 
     def get_sync(self, key: str):
-        """
-        Gets a value for a given key.
-
-        args:
-            key:
-                The unique key for the value.
-
-        returns:
-            The value associated with this key or None.
-        """
-
         return super().get_sync(f"{self.prefix}:{key}")
+
+    def remove_sync(self, key: str):
+        return super().remove_sync(f"{self.prefix}:{key}")
 
 
 class MultiManagedState:

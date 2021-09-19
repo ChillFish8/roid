@@ -227,15 +227,14 @@ class SlashCommands(FastAPI):
             if interaction.data.custom_id is None:
                 return HTTPException(status_code=400)
 
-            custom_id, *reference_id = interaction.data.custom_id.split(":", maxsplit=1)
-            reference_id = reference_id or None
+            custom_id, *_ = interaction.data.custom_id.split(":", maxsplit=1)
 
             component = self._components.get(custom_id)
             if component is None:
                 return HTTPException(status_code=400, detail="No component found")
 
             try:
-                return await component(interaction, reference_id)
+                return await component(interaction)
             except Exception as e:
                 handler = self._global_error_handlers.get(type(e))
                 if handler is not None:
@@ -338,6 +337,7 @@ class SlashCommands(FastAPI):
         disabled: bool = False,
         emoji: constr(strip_whitespace=True, regex=EMOJI_REGEX) = None,
         url: Optional[str] = None,
+        oneshot: bool = False,
     ):
         """
         Attaches a button component to the given command.
@@ -366,6 +366,11 @@ class SlashCommands(FastAPI):
             url:
                 The hyperlink url, if this is set the function body is not invoked
                 on click along with the `emoji` and `style` field being ignored.
+
+            oneshot:
+                If set to True this will remove the context from the store as soon
+                as it's invoked for the first time. This allows you to essentially
+                create one shot buttons which are invalidated after the first use.
         """
 
         if emoji is not None:
@@ -387,6 +392,7 @@ class SlashCommands(FastAPI):
                 label=label,
                 emoji=emoji,
                 url=url,
+                oneshot=oneshot,
             )
 
             if custom_id in self._components:
@@ -410,6 +416,7 @@ class SlashCommands(FastAPI):
         placeholder: str = "Select an option.",
         min_values: conint(ge=0, le=25) = 1,
         max_values: conint(ge=0, le=25) = 1,
+        oneshot: bool = False,
     ):
         """
         A select menu component.
@@ -434,6 +441,11 @@ class SlashCommands(FastAPI):
 
             max_values:
                 The maximum number of values the user can select.
+
+            oneshot:
+                If set to True this will remove the context from the store as soon
+                as it's invoked for the first time. This allows you to essentially
+                create one shot buttons which are invalidated after the first use.
         """
 
         if custom_id is None:
@@ -449,6 +461,7 @@ class SlashCommands(FastAPI):
                 placeholder=placeholder,
                 min_values=min_values,
                 max_values=max_values,
+                oneshot=oneshot,
             )
 
             if custom_id in self._components:

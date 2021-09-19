@@ -4,10 +4,9 @@ import uvicorn
 import logging
 
 from roid import SlashCommands, response, Embed, CommandType, Interaction
-from roid.components import ButtonStyle
+from roid.components import ButtonStyle, InvokeContext
 from roid.objects import MemberPermissions
 from roid.helpers import require_user_permissions, hyperlink
-from roid import components
 
 logging.basicConfig(level=logging.INFO)
 
@@ -48,9 +47,11 @@ async def test(interaction: Interaction):
     style=ButtonStyle.PRIMARY,
     label="Click me",
     emoji="<:CrunchyRollLogo:676087821596885013>",
+    oneshot=True,
 )
-async def test_button_click():
-    ...
+async def test_button_click(ctx: InvokeContext):
+
+    await ctx.purge()
 
 
 #
