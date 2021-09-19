@@ -410,55 +410,7 @@ class Command(OptionalAsyncCallable):
         except Exception as e:
             return await self._invoke_error_handler(interaction, e)
 
-        response = await self._invoke(interaction)
-
-        if isinstance(response, ResponsePayload):
-            return response
-
-        if not isinstance(response, (DeferredResponsePayload, ResponseData)):
-            raise TypeError(
-                f"expected either: {ResponsePayload!r}, "
-                f"{ResponseData!r} or {DeferredResponsePayload!r} return type."
-            )
-
-        if response.components is None:
-            return ResponsePayload(
-                type=ResponseType.CHANNEL_MESSAGE_WITH_SOURCE, data=response
-            )
-
-        state = self.app.state[COMMAND_STATE_TARGET]
-
-        action_rows = []
-        components = response.components
-        for block in components:
-            component_block = []
-            for c in block:
-                if not isinstance(c, (Component, DeferredComponent)):
-                    raise TypeError(
-                        f"invalid component given, expected type "
-                        f"`Component` or `DeferredComponent` got {type(c)!r}"
-                    )
-
-                if isinstance(c, DeferredComponent):
-                    c = c(app=self.app)
-
-                data = c.data
-
-                # If its got a url we wont get invoked on a click
-                # so we can ignore setting a reference id.
-                if data.url is None:
-                    reference_id = str(uuid.uuid4())
-                    data.custom_id = f"{data.custom_id}:{reference_id}"
-                    await state.set(reference_id, response.component_context)
-
-                component_block.append(c.data)
-            action_row = ActionRow(components=component_block)
-            action_rows.append(action_row)
-
-        resp = response.dict()
-        del resp["components"]
-        data = ResponseData(**resp, components=action_rows)
-        return ResponsePayload(type=ResponseType.CHANNEL_MESSAGE_WITH_SOURCE, data=data)
+        return await self._invoke(interaction)
 
     def error(
         self,
