@@ -25,7 +25,10 @@ class TestAnimal(Enum):
 
 @require_user_permissions(MemberPermissions.ADMINISTRATOR)
 @app.command(
-    "say-hello", "oofies", type=CommandType.CHAT_INPUT, guild_id=675647130647658527
+    "say-hello",
+    "oofies",
+    type=CommandType.CHAT_INPUT,
+    guild_id=675647130647658527,
 )
 async def test():
     resp = Response(
@@ -50,12 +53,11 @@ async def test():
     emoji="<:CrunchyRollLogo:676087821596885013>",
     oneshot=True,
 )
-async def test_button_click(ctx: InvokeContext):
-    # The button click will be reject next time someone clicks it
-    await ctx.destroy()
+async def test_button_click():
+    print("hmm?")
 
     # An empty response or None results in the parent message not being touched.
-    return Response(delete_parent=True)
+    return Response()
 
 
 #

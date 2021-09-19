@@ -177,6 +177,7 @@ class _SqliteRunner:
         cur = db.cursor()
         cur.execute("DELETE FROM store WHERE key = ?", (key,))
         cur.close()
+        db.commit()
 
     @staticmethod
     def _set(
@@ -194,6 +195,7 @@ class _SqliteRunner:
             (key, value, ttl),
         )
         cur.close()
+        db.commit()
 
     def _get(self, db: sqlite3.Connection, key: str) -> Optional[bytes]:
         cur = db.cursor()

@@ -113,6 +113,30 @@ class Component(OptionalAsyncCallable):
         max_values: Optional[conint(ge=0, le=25)] = None,
         oneshot: bool = False,
     ):
+        """
+        A given discord component that invokes a callback that's
+        either a regular function or a coroutine function.
+
+        This is the wrapping type of both buttons and selects.
+
+        If the callback takes a parameter with the type hinted as an `Interaction` then
+        this will be automatically passed.
+
+        Args:
+            app:
+                The app that's registering the components.
+                This is required due to how the internal state manages
+                the components context.
+
+            callback:
+                The function to be invoked when the component is triggered.
+
+                If this is a link button is never called so it would be a good idea
+                to use the helper function.
+
+
+        """
+
         super().__init__(callback, None)
 
         if options is None:
@@ -188,24 +212,21 @@ class Component(OptionalAsyncCallable):
         else:
             reference_id = reference_id[0]
 
-        ctx = None
+        state = self.app.state[COMMAND_STATE_TARGET]
+
+        ctx = await state.get(reference_id)
         kwargs = {}
-        if self._pass_context_to is not None:
-            state = self.app.state[COMMAND_STATE_TARGET]
-            ctx = await state.get(reference_id)
+        if self._pass_context_to is not None and ctx is not None:
+            kwargs[self._pass_context_to] = InvokeContext(reference_id, state, **ctx)
 
-            if ctx is None and (self._pass_context_to not in self.defaults):
-                raise AbortInvoke(
-                    content="This button has expired.",
-                    flags=ResponseFlags.EPHEMERAL,
-                    response_type=ResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-                )
-            elif ctx is not None:
-                kwargs[self._pass_context_to] = InvokeContext(
-                    reference_id, state, **ctx
-                )
+        if ctx is None and (self._pass_context_to not in self.defaults):
+            raise AbortInvoke(
+                content="This button has expired.",
+                flags=ResponseFlags.EPHEMERAL,
+                response_type=ResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            )
 
-                if self._oneshot:
-                    await state.remove(reference_id)
+        if self._oneshot:
+            await state.remove(reference_id)
 
         return kwargs, ctx and ctx.get("parent")

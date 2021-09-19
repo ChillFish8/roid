@@ -111,7 +111,7 @@ class UserMissingPermissions(CheckError):
 
 @validate_arguments
 def require_user_permissions(
-    flags: Union[int, List[MemberPermissions]],
+    flags: int,
     on_reject: Optional[Callable[[Interaction], ResponsePayload]] = None,
 ):
     """
@@ -123,17 +123,14 @@ def require_user_permissions(
 
     Args:
         flags:
-            The given permission flags. This can either be a integer representing
-            the flags or a list of MemberPermissions (Which will be implicitly converted)
+            The given permission flags. This should be an integer which can be made
+            from taking the bitwise OR of several MemberPermissions.
         on_reject:
             The callback to be invoked should the check fail, if this is None the
             callback is ignore.
 
             If this is not None then the interaction data is passed.
     """
-
-    if isinstance(flags, list):
-        flags = reduce(or_, map(lambda x: x.value, flags))
 
     def wrapper(func):
         if not isinstance(func, Command):
