@@ -490,7 +490,8 @@ class SlashCommands(FastAPI):
             if url is None:
                 if custom_id in self._components:
                     raise ComponentAlreadyExists(
-                        f"component with custom_id {custom_id!r} has already been defined and registered"
+                        f"component with custom_id {custom_id!r} has "
+                        f"already been defined and registered"
                     )
 
                 self._components[custom_id] = component
