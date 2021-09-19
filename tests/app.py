@@ -33,8 +33,6 @@ class TestAnimal(Enum):
     guild_id=675647130647658527,
 )
 async def test():
-    print("being called again")
-
     resp = Response(
         embed=Embed(title=f"Hello, world", color=0xFFFFF),
         components=[
@@ -45,7 +43,7 @@ async def test():
                     url="https://pydantic-docs.helpmanual.io/usage/types/#urls",
                 ),
             ],
-            [test_selection],
+            test_selection,
         ],
     )
 

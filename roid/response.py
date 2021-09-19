@@ -42,7 +42,15 @@ class ResponseData(BaseModel):
 
 
 class DeferredResponsePayload(ResponseData):
-    components: Optional[List[List[Union[Component, DeferredComponent]]]]
+    components: Optional[
+        List[
+            Union[
+                List[Union[Component, DeferredComponent]],
+                DeferredComponent,
+                Component,
+            ],
+        ]
+    ]
 
     class Config:
         arbitrary_types_allowed = True
