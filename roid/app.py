@@ -34,6 +34,7 @@ from roid.response import (
     DeferredResponsePayload,
     ResponseType,
     ResponseData,
+    Response,
 )
 from roid.http import HttpHandler
 from roid.state import (
@@ -226,20 +227,16 @@ class SlashCommands(FastAPI):
             return HTTPException(status_code=422, detail=e.errors())
 
         if interaction.type == InteractionType.PING:
-            return {"type": 1}
+            return {"type": ResponseType.PONG}
         elif interaction.type == InteractionType.APPLICATION_COMMAND:
             cmd = self._commands.get(interaction.data.name)
             if cmd is None:
                 return HTTPException(status_code=400, detail="No command found")
 
-            try:
-                resp = await cmd(interaction)
-                return self.process_response(resp)
-            except Exception as e:
-                handler = self._global_error_handlers.get(type(e))
-                if handler is not None:
-                    return self.process_response(handler(e))
-                raise e from None
+            DEFAULT_RESPONSE_TYPE = ResponseType.CHANNEL_MESSAGE_WITH_SOURCE
+            return await self._invoke_with_handlers(
+                cmd, interaction, DEFAULT_RESPONSE_TYPE
+            )
 
         elif interaction.type == InteractionType.MESSAGE_COMPONENT:
             if interaction.data.custom_id is None:
@@ -251,75 +248,50 @@ class SlashCommands(FastAPI):
             if component is None:
                 return HTTPException(status_code=400, detail="No component found")
 
-            try:
-                resp = await component(interaction)
-                return self.process_response(resp)
-            except Exception as e:
-                handler = self._global_error_handlers.get(type(e))
-                if handler is not None:
-                    return self.process_response(handler(e))
-                raise e from None
+            DEFAULT_RESPONSE_TYPE = ResponseType.UPDATE_MESSAGE
+            return await self._invoke_with_handlers(
+                component, interaction, DEFAULT_RESPONSE_TYPE
+            )
 
         raise HTTPException(status_code=400)
 
-    @validate_arguments
-    def process_response(
+    async def _invoke_with_handlers(
+        self, callback, interaction: Interaction, default_response_type: ResponseType
+    ) -> ResponsePayload:
+        try:
+            resp = await callback(interaction)
+        except Exception as e:
+            handler = self._global_error_handlers.get(type(e))
+            if handler is None:
+                raise e from None
+            resp = handler(e)
+
+        return await self.process_response(default_response_type, resp)
+
+    @validate_arguments(config={"arbitrary_types_allowed": True})
+    async def process_response(
         self,
         default_response_type: ResponseType,
         response: Union[
             ResponsePayload,
-            DeferredResponsePayload,
+            Response,
             ResponseData,
         ],
     ) -> ResponsePayload:
-
         if isinstance(response, ResponsePayload):
             return response
 
-        if not isinstance(response, (DeferredResponsePayload, ResponseData)):
-            raise TypeError(
-                f"expected either: {ResponsePayload!r}, "
-                f"{ResponseData!r} or {DeferredResponsePayload!r} return type."
+        if isinstance(response, Response):
+            return await response.into_response_payload(
+                app=self, default_type=default_response_type
             )
+        elif isinstance(response, ResponseData):
+            return ResponsePayload(type=default_response_type, data=response)
 
-        if response.components is None:
-            return ResponsePayload(
-                type=ResponseType.CHANNEL_MESSAGE_WITH_SOURCE, data=response
-            )
-
-        state = self.state[COMMAND_STATE_TARGET]
-
-        action_rows = []
-        components = response.components
-        for block in components:
-            component_block = []
-            for c in block:
-                if not isinstance(c, (Component, DeferredComponent)):
-                    raise TypeError(
-                        f"invalid component given, expected type "
-                        f"`Component` or `DeferredComponent` got {type(c)!r}"
-                    )
-
-                if isinstance(c, DeferredComponent):
-                    c = c(app=self)
-
-                data = c.data
-
-                # If its got a url we wont get invoked on a click
-                # so we can ignore setting a reference id.
-                if data.url is None:
-                    reference_id = str(uuid.uuid4())
-                    data.custom_id = f"{data.custom_id}:{reference_id}"
-                    await state.set(reference_id, response.component_context)
-
-                component_block.append(c.data)
-            action_row = ActionRow(components=component_block)
-            action_rows.append(action_row)
-
-        resp = response.dict()
-        del resp["components"]
-        data = ResponseData(**resp, components=action_rows)
-        return ResponsePayload(type=default_response_type, data=data)
+        raise TypeError(
+            f"expected either: {ResponsePayload!r}, "
+            f"{ResponseData!r} or {Response!r} return type."
+        )
 
     @validate_arguments
     def command(

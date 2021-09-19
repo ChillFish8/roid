@@ -1,7 +1,15 @@
+from __future__ import annotations
+
+import uuid
 from enum import IntEnum
-from typing import List, Optional, Dict, Any, Union
+from typing import List, Optional, Dict, Any, Union, TYPE_CHECKING
 
 from pydantic import BaseModel, constr, validate_arguments
+
+from roid.state import COMMAND_STATE_TARGET
+
+if TYPE_CHECKING:
+    from roid.app import SlashCommands
 
 from roid.deferred import DeferredComponent
 from roid.components import Component, ActionRow
@@ -57,71 +65,123 @@ class ResponsePayload(BaseModel):
     data: Optional[ResponseData] = None
 
 
-@validate_arguments(config={"arbitrary_types_allowed": True})
-def response(
-    content: str = None,
-    *,
-    embed: Embed = None,
-    embeds: List[Embed] = None,
-    allowed_mentions: AllowedMentions = None,
-    flags: int = None,
-    tts: bool = False,
-    components: Optional[List[List[Union[Component, DeferredComponent]]]] = None,
-    component_context: Optional[Dict[str, Any]] = None,
-) -> DeferredResponsePayload:
+class Response:
     """
     A response to the given interaction.
     You need to pass an embed, embeds, content or a mixture of the 3.
     If not values are passed this will result in a ValueError.
-
-    Args:
-        content:
-            The content of the message to respond with.
-
-        embed:
-            The rich embed to respond with.
-
-        embeds:
-            A list of rich embeds to respond with.
-
-        allowed_mentions:
-            An optional `AllowedMentions` object that describes what mentions to allow or suppress.
-
-        flags:
-            A set of `ResponseFlags` these are bitflags so can be
-            joined via the `|` operator.
-
-        tts:
-            Indicates if the message should be sent using text-to-speech.
-
-        components:
-            A optional list of components to attach to the response.
-
-        component_context:
-            Any given state to be passed to the components on invocation.
-            If you need to provide data to the component you *MUST* use this
-            rather than a global variable as this guarantees synchronisation across
-            processes.
-
-            If you're only running 1 process (not advised for scaling) then you can
-            ignore the above warning however, you will need to to change the code
-            base if you later plan to use multi processing.
-
-    Returns:
-        A `ResponsePayload` object.
     """
 
-    embeds = embeds or []
+    @validate_arguments(config={"arbitrary_types_allowed": True})
+    def __init__(
+        self,
+        content: str = None,
+        *,
+        embed: Embed = None,
+        embeds: List[Embed] = None,
+        allowed_mentions: AllowedMentions = None,
+        flags: int = None,
+        tts: bool = False,
+        components: Optional[List[List[Union[Component, DeferredComponent]]]] = None,
+        component_context: Optional[Dict[str, Any]] = None,
+        response_type: Optional[ResponseType] = None,
+    ):
+        """
+        A response to the given interaction.
+        You need to pass an embed, embeds, content or a mixture of the 3.
+        If not values are passed this will result in a ValueError.
 
-    if embed is not None:
-        embeds.append(embed)
+        Args:
+            content:
+                The content of the message to respond with.
 
-    return DeferredResponsePayload(
-        tts=tts,
-        allowed_mentions=allowed_mentions,
-        flags=flags,
-        embeds=embeds if embeds else None,
-        content=content,
-        components=components,
-        component_context=component_context,
-    )
+            embed:
+                The rich embed to respond with.
+
+            embeds:
+                A list of rich embeds to respond with.
+
+            allowed_mentions:
+                An optional `AllowedMentions` object that describes what mentions to allow or suppress.
+
+            flags:
+                A set of `ResponseFlags` these are bitflags so can be
+                joined via the `|` operator.
+
+            tts:
+                Indicates if the message should be sent using text-to-speech.
+
+            components:
+                A optional list of components to attach to the response.
+
+            component_context:
+                Any given state to be passed to the components on invocation.
+                If you need to provide data to the component you *MUST* use this
+                rather than a global variable as this guarantees synchronisation across
+                processes.
+
+                If you're only running 1 process (not advised for scaling) then you can
+                ignore the above warning however, you will need to to change the code
+                base if you later plan to use multi processing.
+
+        Returns:
+            A `ResponsePayload` object.
+        """
+
+        embeds = embeds or []
+
+        if embed is not None:
+            embeds.append(embed)
+
+        self._response_type = response_type
+        self._payload = DeferredResponsePayload(
+            tts=tts,
+            allowed_mentions=allowed_mentions,
+            flags=flags,
+            embeds=embeds if embeds else None,
+            content=content,
+            components=components,
+            component_context=component_context,
+        )
+
+    async def into_response_payload(
+        self, app: SlashCommands, default_type: ResponseType
+    ):
+        if self._payload.components is None:
+            return ResponsePayload(
+                type=ResponseType.CHANNEL_MESSAGE_WITH_SOURCE, data=self._payload
+            )
+
+        state = app.state[COMMAND_STATE_TARGET]
+
+        action_rows = []
+        components = self._payload.components
+        for block in components:
+            component_block = []
+            for c in block:
+                if not isinstance(c, (Component, DeferredComponent)):
+                    raise TypeError(
+                        f"invalid component given, expected type "
+                        f"`Component` or `DeferredComponent` got {type(c)!r}"
+                    )
+
+                if isinstance(c, DeferredComponent):
+                    c = c(app=app)
+
+                data = c.data
+
+                # If its got a url we wont get invoked on a click
+                # so we can ignore setting a reference id.
+                if data.url is None:
+                    reference_id = str(uuid.uuid4())
+                    data.custom_id = f"{data.custom_id}:{reference_id}"
+                    await state.set(reference_id, self._payload.component_context)
+
+                component_block.append(c.data)
+            action_row = ActionRow(components=component_block)
+            action_rows.append(action_row)
+
+        resp = self._payload.dict()
+        del resp["components"]
+        data = ResponseData(**resp, components=action_rows)
+        return ResponsePayload(type=self._response_type or default_type, data=data)

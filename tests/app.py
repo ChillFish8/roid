@@ -3,10 +3,11 @@ from enum import Enum
 import uvicorn
 import logging
 
-from roid import SlashCommands, response, Embed, CommandType, Interaction
+from roid import SlashCommands, Embed, CommandType, Interaction
 from roid.components import ButtonStyle, InvokeContext
 from roid.objects import MemberPermissions
 from roid.helpers import require_user_permissions, hyperlink
+from roid.response import Response
 
 logging.basicConfig(level=logging.INFO)
 
@@ -27,7 +28,7 @@ class TestAnimal(Enum):
     "say-hello", "oofies", type=CommandType.CHAT_INPUT, guild_id=675647130647658527
 )
 async def test(interaction: Interaction):
-    resp = response(
+    resp = Response(
         embed=Embed(title=f"Hello, world", color=0xFFFFF),
         components=[
             [
