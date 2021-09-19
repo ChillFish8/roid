@@ -1,10 +1,13 @@
+from __future__ import annotations
+
 import asyncio
 import functools
 import inspect
 
-from typing import Any, Callable, Coroutine, Union, Optional, Dict
+from typing import Any, Callable, Coroutine, Union, Optional, Dict, TYPE_CHECKING
 
-from roid import Interaction
+if TYPE_CHECKING:
+    from roid.interactions import Interaction
 
 
 class OptionalAsyncCallable:
@@ -22,12 +25,12 @@ class OptionalAsyncCallable:
             self._on_error_is_coro = False
 
         self._on_error = on_error
-        self._spec = inspect.getfullargspec(callback)
+        self.spec = inspect.getfullargspec(callback)
 
         default_args = {}
-        if self._spec.defaults is not None:
-            delta = len(self._spec.args) - len(self._spec.defaults)
-            default_args = dict(zip(self._spec.args[delta:], self._spec.defaults))
+        if self.spec.defaults is not None:
+            delta = len(self.spec.args) - len(self.spec.defaults)
+            default_args = dict(zip(self.spec.args[delta:], self.spec.defaults))
 
         self._default_args = default_args
 
@@ -43,7 +46,7 @@ class OptionalAsyncCallable:
 
     @property
     def annotations(self) -> Dict[str, Any]:
-        return self._spec.annotations
+        return self.spec.annotations
 
     async def __call__(self, interaction: Interaction) -> Any:
         try:

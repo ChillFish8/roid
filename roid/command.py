@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import uuid
-import asyncio
-import functools
 import inspect
 import typing
 
@@ -37,6 +35,7 @@ from roid.extractors import extract_options
 from roid.checks import CommandCheck
 from roid.response import ResponsePayload
 from roid.state import COMMAND_STATE_TARGET
+from roid.callers import OptionalAsyncCallable
 
 
 class CommandContext(BaseModel):
@@ -199,7 +198,7 @@ class PassTarget(IntEnum):
     MEMBER = auto()
 
 
-class Command:
+class Command(OptionalAsyncCallable):
     def __init__(
         self,
         app: SlashCommands,
@@ -213,10 +212,13 @@ class Command:
         cmd_type: CommandType = CommandType.CHAT_INPUT,
         defer_register: bool = True,
     ):
+        super().__init__(
+            callback=validate_arguments(callback),
+            on_error=default_on_error,
+        )
+
         self.app = app
         self.defer_register = defer_register
-
-        spec = inspect.getfullargspec(callback)
 
         # Sets up how we should handle special case type hints.
         # The pass_target is only valid for MESSAGE and USER commands,
@@ -226,18 +228,18 @@ class Command:
         # so we also remove them from the annotations.
         self._pass_target: Tuple[PassTarget, str] = (PassTarget.NONE, "_")
         self._pass_interaction: Optional[str] = None
-        for param, type_ in spec.annotations.copy().items():
+        for param, type_ in self.annotations.copy().items():
             if type_ is Interaction:
-                del spec.annotations[param]
+                del self.annotations[param]
                 self._pass_interaction = param
             elif type_ is PartialMessage:
-                del spec.annotations[param]
+                del self.annotations[param]
                 self._pass_target = (PassTarget.MESSAGE, param)
             elif type_ is User:
-                del spec.annotations[param]
+                del self.annotations[param]
                 self._pass_target = (PassTarget.USER, param)
             elif type_ is Member:
-                del spec.annotations[param]
+                del self.annotations[param]
                 self._pass_target = (PassTarget.MEMBER, param)
             elif type_ is Interaction and self._pass_target is not None:
                 raise AttributeError(
@@ -247,7 +249,7 @@ class Command:
         options = []
         self._defaults: Dict[str, Any] = {}
 
-        for option, default in get_details_from_spec(name, spec):
+        for option, default in get_details_from_spec(name, self.spec):
             if cmd_type in (CommandType.MESSAGE, CommandType.USER):
                 raise ValueError(f"only CHAT_INPUT types can have options / input")
 
@@ -275,13 +277,7 @@ class Command:
         self.default_permission = default_permissions
         self.options = options if len(options) != 0 else None
 
-        self._callback_is_coroutine = asyncio.iscoroutinefunction(callback)
-        self._callback = validate_arguments(callback)
         self._checks_pipeline: List[CommandCheck] = []
-        self._on_error = default_on_error
-
-    def __call__(self, interaction: Interaction):
-        return self._run_checks_pipeline(interaction)
 
     async def register(self, app: SlashCommands):
         """
@@ -389,25 +385,20 @@ class Command:
         else:
             return {}
 
-    async def _invoke(self, interaction: Interaction) -> ResponsePayload:
+    async def _get_kwargs(self, interaction: Interaction) -> dict:
         kwargs = self._get_invoke_kwargs(interaction)
 
         if self._pass_interaction is not None:
             kwargs[self._pass_interaction] = interaction
 
-        if self._callback_is_coroutine:
-            return await self._callback(**kwargs)
+        return kwargs
 
-        partial = functools.partial(self._callback, **kwargs)
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, partial)
-
-    async def _run_checks_pipeline(self, interaction: Interaction) -> ResponsePayload:
+    async def __call__(self, interaction: Interaction) -> ResponsePayload:
         try:
             for check in self._checks_pipeline:
                 interaction = await check(interaction)
         except Exception as e:
-            return await self._on_error(interaction, e)
+            return await self._invoke_error_handler(interaction, e)
 
         response = await self._invoke(interaction)
 
@@ -449,4 +440,5 @@ class Command:
                 or a regular sync function (sync functions will be ran in a new
                 thread.)
         """
-        self._on_error = func
+        self._register_error_handler(func)
+        return func

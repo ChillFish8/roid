@@ -1,17 +1,22 @@
+from __future__ import annotations
+
 from functools import reduce
 from operator import or_
-from typing import Optional, Union, List, Callable
+from typing import Optional, Union, List, Callable, TYPE_CHECKING
 
 from pydantic import validate_arguments
 
+if TYPE_CHECKING:
+    from roid.app import SlashCommands
+
 from roid.checks import (
-    SyncOrAsyncCallableError,
-    SyncOrAsyncCallable,
+    SyncOrAsyncCheckError,
+    SyncOrAsyncCheck,
     CommandCheck,
     CheckError,
 )
 from roid.command import Command
-from roid.components import ButtonStyle, button
+from roid.components import ButtonStyle
 from roid.objects import MemberPermissions
 from roid.response import ResponsePayload
 from roid.interactions import Interaction
@@ -19,6 +24,27 @@ from roid.interactions import Interaction
 
 def _null():
     pass
+
+
+class DeferredAppItem:
+    def __init__(
+        self,
+        target_name: str,
+        call_pipeline: List[Union[dict, list]],
+    ):
+        self._target_name = target_name
+        self._call_pipeline = call_pipeline
+
+    def __call__(self, app: SlashCommands):
+        caller = getattr(app, self._target_name)
+
+        for params in self._call_pipeline:
+            if isinstance(params, dict):
+                caller = caller(**params)
+            else:
+                caller = caller(*params)
+
+        return caller
 
 
 @validate_arguments
@@ -45,19 +71,22 @@ def hyperlink(
             If the button should be disabled or not. (If it can be clicked or not.)
     """
 
-    btn = button(
-        style=ButtonStyle.Link,
-        disabled=disabled,
-        label=label,
-        url=url,  # noqa
-    )(_null)
-    return btn
+    return DeferredAppItem(
+        "button",
+        call_pipeline=[
+            dict(
+                style=ButtonStyle.Link,
+                disabled=disabled,
+                label=label,
+                url=url,
+            ),
+            [_null],
+        ],
+    )
 
 
 @validate_arguments
-def check(
-    cb: SyncOrAsyncCallable, on_reject: Optional[SyncOrAsyncCallableError] = None
-):
+def check(cb: SyncOrAsyncCheck, on_reject: Optional[SyncOrAsyncCheckError] = None):
     """
     Creates a command check for a given function with a optional rejection catcher.
 
@@ -73,7 +102,7 @@ def check(
 
     """
 
-    def wrapper(func: Command) -> SyncOrAsyncCallable:
+    def wrapper(func: Command) -> SyncOrAsyncCheck:
         if not isinstance(func, Command):
             raise TypeError(
                 f"cannot add check to {func!r}, "
