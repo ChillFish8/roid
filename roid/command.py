@@ -154,7 +154,7 @@ class Command(OptionalAsyncCallable):
         options = []
         self._option_defaults: Dict[str, Any] = {}
 
-        for option, default in self.get_details_from_spec(name):
+        for option, default in self._get_details_from_spec(name):
             if cmd_type in (CommandType.MESSAGE, CommandType.USER):
                 raise ValueError(f"only CHAT_INPUT types can have options / input")
 
@@ -184,7 +184,7 @@ class Command(OptionalAsyncCallable):
 
         self._checks_pipeline: List[CommandCheck] = []
 
-    def get_details_from_spec(
+    def _get_details_from_spec(
         self,
         cmd_name: str,
     ) -> List[Tuple[CommandOption, Any]]:
