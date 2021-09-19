@@ -228,7 +228,6 @@ class SlashCommands(FastAPI):
             return {"type": ResponseType.PONG}
         elif interaction.type == InteractionType.APPLICATION_COMMAND:
             cmd = self._commands.get(interaction.data.name)
-            print(cmd)
             if cmd is None:
                 raise HTTPException(status_code=400, detail="No command found")
 
@@ -273,7 +272,9 @@ class SlashCommands(FastAPI):
         if pass_parent:
             args.append(interaction)
 
-        return await self.process_response(*args)
+        resp = await self.process_response(*args)
+        _log.debug("returning response: %s", resp)
+        return resp
 
     @validate_arguments(config={"arbitrary_types_allowed": True})
     async def process_response(

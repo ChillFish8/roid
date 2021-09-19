@@ -182,7 +182,7 @@ class Response:
                 if isinstance(c, DeferredComponent):
                     c = c(app=app)
 
-                data = c.data
+                data = c.data.copy()
 
                 # If its got a url we wont get invoked on a click
                 # so we can ignore setting a reference id.
@@ -197,7 +197,7 @@ class Response:
                         },
                     )
 
-                component_block.append(c.data)
+                component_block.append(data)
             action_row = ActionRow(components=component_block)
             action_rows.append(action_row)
 
