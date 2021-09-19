@@ -54,12 +54,6 @@ class ResponsePayload(BaseModel):
 
 
 class Response:
-    """
-    A response to the given interaction.
-    You need to pass an embed, embeds, content or a mixture of the 3.
-    If not values are passed this will result in a ValueError.
-    """
-
     @validate_arguments(config={"arbitrary_types_allowed": True})
     def __init__(
         self,
