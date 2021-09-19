@@ -37,7 +37,7 @@ async def test():
                     "Click Me",
                     url="https://pydantic-docs.helpmanual.io/usage/types/#urls",
                 ),
-            ]
+            ]`
         ],
     )
 

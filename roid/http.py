@@ -121,7 +121,6 @@ class HttpHandler:
         with MaybeUnlock(self.lock) as lock:
             r = None
             for tries in range(5):
-                print(tries)
                 try:
                     r = await self.client.request(
                         method, url, headers=set_headers, **extra
