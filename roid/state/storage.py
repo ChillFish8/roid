@@ -198,7 +198,7 @@ class _SqliteRunner:
     def _get(self, db: sqlite3.Connection, key: str) -> Optional[bytes]:
         cur = db.cursor()
         cur.execute(
-            "SELECT (store_value, delete_after) FROM store WHERE key = ?",
+            "SELECT * FROM store WHERE key = ?",
             (key,),
         )
         v = cur.fetchone()
@@ -207,9 +207,9 @@ class _SqliteRunner:
         if v is None:
             return None
 
-        delete_after = v[1]
+        delete_after = v[2]
         if delete_after is not None:
             if datetime.utcnow() > datetime.utcfromtimestamp(delete_after):
                 self._delete(db, key)
                 return None
-        return v[0]
+        return v[1]
