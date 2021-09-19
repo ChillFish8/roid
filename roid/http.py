@@ -167,7 +167,6 @@ class HttpHandler:
                         raise NotFound(r, data)
                     elif r.status_code == 400:
                         errors = data["errors"]
-                        print(errors, headers)
 
                         sections = []
                         for location, detail in errors.items():

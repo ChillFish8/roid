@@ -51,7 +51,7 @@ async def test(interaction: Interaction):
     oneshot=True,
 )
 async def test_button_click(ctx: InvokeContext):
-
+    print("done!")
     await ctx.purge()
 
 

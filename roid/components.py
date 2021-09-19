@@ -176,5 +176,4 @@ class Component(OptionalAsyncCallable):
 
                 if self._oneshot:
                     await state.remove(reference_id)
-
         return kwargs

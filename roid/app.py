@@ -2,17 +2,6 @@ import re
 import logging
 import uuid
 
-from roid.components import (
-    Component,
-    ComponentType,
-    ButtonStyle,
-    EMOJI_REGEX,
-    ActionRow,
-)
-from roid.deferred import DeferredComponent
-from roid.exceptions import CommandAlreadyExists, ComponentAlreadyExists
-from roid.objects import PartialEmoji
-
 try:
     import orjson as json
 except ImportError:
@@ -26,12 +15,19 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import HTTPException
 from pydantic import ValidationError, validate_arguments, constr, conint
 
+from roid.components import (
+    Component,
+    ComponentType,
+    ButtonStyle,
+    EMOJI_REGEX,
+)
+from roid.exceptions import CommandAlreadyExists, ComponentAlreadyExists
+from roid.objects import PartialEmoji
 from roid.command import CommandType, Command
 from roid.interactions import InteractionType, Interaction
 from roid.error_handlers import KNOWN_ERRORS
 from roid.response import (
     ResponsePayload,
-    DeferredResponsePayload,
     ResponseType,
     ResponseData,
     Response,
@@ -41,7 +37,6 @@ from roid.state import (
     StorageBackend,
     MultiManagedState,
     SqliteBackend,
-    COMMAND_STATE_TARGET,
 )
 
 _log = logging.getLogger("roid-main")
@@ -256,7 +251,10 @@ class SlashCommands(FastAPI):
         raise HTTPException(status_code=400)
 
     async def _invoke_with_handlers(
-        self, callback, interaction: Interaction, default_response_type: ResponseType
+        self,
+        callback,
+        interaction: Interaction,
+        default_response_type: ResponseType,
     ) -> ResponsePayload:
         try:
             resp = await callback(interaction)
@@ -278,6 +276,24 @@ class SlashCommands(FastAPI):
             ResponseData,
         ],
     ) -> ResponsePayload:
+        """
+        Converts any of the possible response types into a ResponsePayload.
+
+        This is mostly useful for deferred components and allowing some level
+        of dynamic handling for users.
+
+        Args:
+            default_response_type:
+                The default ResponseType to use if the Response object / data
+                has not been set one.
+            response:
+                A given instance of the possible response types to process and
+                convert.
+
+        Returns:
+            A ResponsePayload instance that has had all deferred components
+            resolved.
+        """
         if isinstance(response, ResponsePayload):
             return response
 
@@ -454,8 +470,8 @@ class SlashCommands(FastAPI):
                 raise ComponentAlreadyExists(
                     f"component with custom_id {custom_id!r} has already been defined and registered"
                 )
-            self._components[custom_id] = component
 
+            self._components[custom_id] = component
             return component
 
         return wrapper
