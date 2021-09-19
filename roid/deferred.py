@@ -74,6 +74,19 @@ class DeferredCommand(DeferredAppItem):
         default_permissions: bool = False,
         defer_register: bool = True,
     ):
+        """
+        A command like structure that creates a build pipeline
+        when it's initialised by the app.
+
+        This is useful for code organisation as it allows you to avoid circular imports
+        in the structure.
+
+        This has some limitations in the sense that only the public command fields are
+        available and register() must be initialised first or a TypeError will be raised.
+
+        todo attrs docs
+        """
+
         self._initialised: Optional[Command] = None
         super().__init__(
             "command",
