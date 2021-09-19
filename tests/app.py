@@ -1,10 +1,12 @@
 import os
 from enum import Enum
+from typing import List, Literal
+
 import uvicorn
 import logging
 
-from roid import SlashCommands, Embed, CommandType
-from roid.components import ButtonStyle, InvokeContext
+from roid import SlashCommands, Embed, CommandType, SelectValue
+from roid.components import ButtonStyle
 from roid.objects import MemberPermissions
 from roid.helpers import require_user_permissions, hyperlink
 from roid.response import Response
@@ -35,12 +37,13 @@ async def test():
         embed=Embed(title=f"Hello, world", color=0xFFFFF),
         components=[
             [
-                test_button_click,
+                delete_button,
                 hyperlink(
                     "Click Me",
                     url="https://pydantic-docs.helpmanual.io/usage/types/#urls",
                 ),
-            ]
+            ],
+            [test_selection],
         ],
     )
 
@@ -50,28 +53,23 @@ async def test():
 @app.button(
     style=ButtonStyle.PRIMARY,
     label="Delete",
-    emoji="<:CrunchyRollLogo:676087821596885013>",
     oneshot=True,
 )
-async def test_button_click():
-    print("hmm?")
-
+async def delete_button():
     # An empty response or None results in the parent message not being touched.
-    return Response()
+    return Response(delete_parent=True)
 
 
-#
-#
-# class TestSelect(Enum):
-#     You = "You Are A Private 0"
-#     Are = "You Are A Private 1"
-#     A = "You Are A Private 2"
-#     Pirate = "You Are A Private 3"
-#
-#
-# @test.select(min_values=1, max_values=3)
-# async def test_selection(choices: List[TestSelect]):
-#     ...
+class TestSelect(Enum):
+    You = SelectValue("Pick me!")
+    Are = SelectValue("Or me!")
+    A = SelectValue("Or mee!")
+    Pirate = SelectValue("Or meee!")
+
+
+@app.select(min_values=1, max_values=3)
+async def test_selection(choices: List[TestSelect]):
+    ...
 
 
 if __name__ == "__main__":

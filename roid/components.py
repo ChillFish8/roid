@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import pprint
+import re
 import asyncio
 import functools
 from enum import IntEnum, auto
 from typing import Optional, Union, List, Callable, Any, Coroutine, TYPE_CHECKING, Tuple
-from pydantic import BaseModel, conint, AnyHttpUrl, constr
+from pydantic import BaseModel, conint, AnyHttpUrl, constr, validate_arguments
 
 from roid.exceptions import InvalidComponent, AbortInvoke
 from roid.objects import PartialEmoji, ResponseFlags, ResponseType
@@ -24,6 +26,7 @@ if TYPE_CHECKING:
         Union[ResponsePayload, Coroutine[Any, Any, ResponsePayload]],
     ]
 
+LimitedStr = constr(strip_whitespace=True, max_length=100, min_length=1)
 EMOJI_REGEX = r"<(a)?:([a-zA-Z0-9]+):([0-9]{17,26})>"
 
 
@@ -34,11 +37,14 @@ class ComponentType(IntEnum):
 
 
 class SelectOption(BaseModel):
-    label: str
-    value: str
-    description: Optional[str] = None
+    label: LimitedStr
+    value: LimitedStr
+    description: Optional[LimitedStr] = None
     emoji: Optional[PartialEmoji]
     default: bool = False
+
+    def __eq__(self, other: SelectOption):
+        return self.label == other.label
 
 
 class ButtonStyle(IntEnum):
@@ -51,7 +57,7 @@ class ButtonStyle(IntEnum):
 
 class ComponentContext(BaseModel):
     type: ComponentType
-    custom_id: Optional[str]
+    custom_id: Optional[LimitedStr]
     disabled: bool
     style: Optional[ButtonStyle]
     label: Optional[str]
@@ -66,6 +72,30 @@ class ComponentContext(BaseModel):
 class ActionRow(BaseModel):
     type: ComponentType = ComponentType.ACTION_ROW
     components: List[ComponentContext]
+
+
+class SelectValue:
+    @validate_arguments
+    def __init__(
+        self,
+        value: LimitedStr,
+        *,
+        label: Optional[LimitedStr] = None,
+        description: Optional[LimitedStr] = None,
+        emoji: Optional[constr(strip_whitespace=True, regex=EMOJI_REGEX)] = None,
+        default: bool = False,
+    ):
+        self.value = value
+        self.label = label or value
+        self.description = description
+        self.default = default
+
+        if emoji is not None:
+            emoji = re.findall(EMOJI_REGEX, emoji)[0]
+            animated, name, id_ = emoji
+            emoji = PartialEmoji(id=id_, name=name, animated=bool(animated))
+
+        self.emoji = emoji
 
 
 class InvokeContext(dict):
@@ -137,7 +167,7 @@ class Component(OptionalAsyncCallable):
 
         """
 
-        super().__init__(callback, None)
+        super().__init__(callback, None, validate=True)
 
         if options is None:
             options = []
@@ -228,5 +258,8 @@ class Component(OptionalAsyncCallable):
 
         if self._oneshot:
             await state.remove(reference_id)
+
+        if self._ctx.options is not None:
+            pprint.pprint(interaction.dict())
 
         return kwargs, ctx and ctx.get("parent")

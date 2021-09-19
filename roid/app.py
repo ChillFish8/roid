@@ -1,6 +1,9 @@
 import re
 import logging
 import uuid
+import inspect
+import typing
+from enum import Enum
 
 try:
     import orjson as json
@@ -10,7 +13,7 @@ except ImportError:
 from nacl.signing import VerifyKey
 from nacl.exceptions import BadSignatureError
 
-from typing import Dict, Type, Callable, Optional, List, Union
+from typing import Dict, Type, Callable, Optional, List, Union, Literal
 from fastapi import FastAPI, Request
 from fastapi.exceptions import HTTPException
 from pydantic import ValidationError, validate_arguments, constr, conint
@@ -20,6 +23,8 @@ from roid.components import (
     ComponentType,
     ButtonStyle,
     EMOJI_REGEX,
+    SelectOption,
+    SelectValue,
 )
 from roid.exceptions import CommandAlreadyExists, ComponentAlreadyExists
 from roid.objects import PartialEmoji
@@ -33,11 +38,8 @@ from roid.response import (
     Response,
 )
 from roid.http import HttpHandler
-from roid.state import (
-    StorageBackend,
-    MultiManagedState,
-    SqliteBackend,
-)
+from roid.state import StorageBackend, MultiManagedState, SqliteBackend
+
 
 _log = logging.getLogger("roid-main")
 
@@ -56,7 +58,7 @@ class SlashCommands(FastAPI):
         application_id: int,
         application_public_key: str,
         token: str,
-        register_commands: bool = False,
+        register_commands: bool = True,
         state_backend: Optional[StorageBackend] = None,
         **extra,
     ):
@@ -542,7 +544,36 @@ class SlashCommands(FastAPI):
         if custom_id is None:
             custom_id = str(uuid.uuid4())
 
+        if max_values < min_values:
+            raise ValueError(
+                f"the minimum amount of select values cannot be "
+                f"larger than the max amount of select values."
+            )
+
         def wrapper(func):
+            spec = inspect.getfullargspec(func)
+
+            options = []
+            for param, hint in spec.annotations.items():
+                if hint is Interaction:
+                    continue
+
+                origin = typing.get_origin(hint)
+
+                # Needed if it's a multi-valued select.
+                if origin is not list and max_values != 1 and min_values != 1:
+                    raise TypeError(
+                        f"multi-value selects must be typed as a List[T] rather than T."
+                    )
+
+                options = _get_select_options(
+                    typing.get_args(hint)[0] if origin is list else hint
+                )
+                if len(options) == 0:
+                    raise ValueError(f"Select options must contain at least one value.")
+
+                break
+
             component = Component(
                 app=self,
                 callback=func,
@@ -553,6 +584,7 @@ class SlashCommands(FastAPI):
                 min_values=min_values,
                 max_values=max_values,
                 oneshot=oneshot,
+                options=options,
             )
 
             if custom_id in self._components:
@@ -564,3 +596,67 @@ class SlashCommands(FastAPI):
             return component
 
         return wrapper
+
+
+def _get_select_options(val: typing.Any) -> List[SelectOption]:
+    option_choices = []
+    if typing.get_origin(val) is Literal:
+        for value in typing.get_args(val):
+            if not isinstance(value, str):
+                raise TypeError(
+                    f"select options have incompatible types. "
+                    f"Literals must be all type `str`. "
+                    f"Expected type str found {type(value)!r}"
+                )
+
+            option = SelectOption(
+                label=value,
+                value=value,
+            )
+
+            if option in option_choices:
+                raise ValueError(f"select options cannot have duplicate labels.")
+
+            option_choices.append(option)
+        return option_choices
+
+    if not issubclass(val, Enum):
+        raise TypeError("invalid type given expected a subclass of Enum or Literal.")
+
+    set_type = None
+    for v in val:
+        if not isinstance(v.value, (str, SelectValue)):
+            raise TypeError(
+                f"select options have incompatible types. "
+                f"enum must contain all `str` types or `SelectValue` types. "
+                f"Found {type(v.value)!r}"
+            )
+
+        if (set_type is not None) and (type(v.value) is not set_type):
+            raise TypeError(
+                f"enum values must all be the same type. "
+                f"Expected type: {set_type!r} got {type(v.value)!r}"
+            )
+        else:
+            set_type = type(v.value)
+
+        if isinstance(v.value, SelectValue):
+            value = v.value
+            option = SelectOption(
+                label=value.label,
+                value=value.value,
+                emoji=value.emoji,
+                description=value.description,
+                default=value.default,
+            )
+        else:
+            option = SelectOption(
+                label=v.value,
+                value=v.value,
+            )
+
+        if option in option_choices:
+            raise ValueError(f"select options cannot have duplicate labels.")
+
+        option_choices.append(option)
+    return option_choices
