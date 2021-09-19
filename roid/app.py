@@ -2,7 +2,14 @@ import re
 import logging
 import uuid
 
-from roid.components import Component, ComponentType, ButtonStyle, EMOJI_REGEX
+from roid.components import (
+    Component,
+    ComponentType,
+    ButtonStyle,
+    EMOJI_REGEX,
+    ActionRow,
+)
+from roid.deferred import DeferredComponent
 from roid.exceptions import CommandAlreadyExists, ComponentAlreadyExists
 from roid.objects import PartialEmoji
 
@@ -14,7 +21,7 @@ except ImportError:
 from nacl.signing import VerifyKey
 from nacl.exceptions import BadSignatureError
 
-from typing import Dict, Type, Callable, Optional, List
+from typing import Dict, Type, Callable, Optional, List, Union
 from fastapi import FastAPI, Request
 from fastapi.exceptions import HTTPException
 from pydantic import ValidationError, validate_arguments, constr, conint
@@ -22,9 +29,19 @@ from pydantic import ValidationError, validate_arguments, constr, conint
 from roid.command import CommandType, Command
 from roid.interactions import InteractionType, Interaction
 from roid.error_handlers import KNOWN_ERRORS
-from roid.response import ResponsePayload
+from roid.response import (
+    ResponsePayload,
+    DeferredResponsePayload,
+    ResponseType,
+    ResponseData,
+)
 from roid.http import HttpHandler
-from roid.state import StorageBackend, MultiManagedState, SqliteBackend
+from roid.state import (
+    StorageBackend,
+    MultiManagedState,
+    SqliteBackend,
+    COMMAND_STATE_TARGET,
+)
 
 _log = logging.getLogger("roid-main")
 
@@ -216,11 +233,12 @@ class SlashCommands(FastAPI):
                 return HTTPException(status_code=400, detail="No command found")
 
             try:
-                return await cmd(interaction)
+                resp = await cmd(interaction)
+                return self.process_response(resp)
             except Exception as e:
                 handler = self._global_error_handlers.get(type(e))
                 if handler is not None:
-                    return handler(e)
+                    return self.process_response(handler(e))
                 raise e from None
 
         elif interaction.type == InteractionType.MESSAGE_COMPONENT:
@@ -234,14 +252,74 @@ class SlashCommands(FastAPI):
                 return HTTPException(status_code=400, detail="No component found")
 
             try:
-                return await component(interaction)
+                resp = await component(interaction)
+                return self.process_response(resp)
             except Exception as e:
                 handler = self._global_error_handlers.get(type(e))
                 if handler is not None:
-                    return handler(e)
+                    return self.process_response(handler(e))
                 raise e from None
 
         raise HTTPException(status_code=400)
+
+    @validate_arguments
+    def process_response(
+        self,
+        default_response_type: ResponseType,
+        response: Union[
+            ResponsePayload,
+            DeferredResponsePayload,
+            ResponseData,
+        ],
+    ) -> ResponsePayload:
+
+        if isinstance(response, ResponsePayload):
+            return response
+
+        if not isinstance(response, (DeferredResponsePayload, ResponseData)):
+            raise TypeError(
+                f"expected either: {ResponsePayload!r}, "
+                f"{ResponseData!r} or {DeferredResponsePayload!r} return type."
+            )
+
+        if response.components is None:
+            return ResponsePayload(
+                type=ResponseType.CHANNEL_MESSAGE_WITH_SOURCE, data=response
+            )
+
+        state = self.state[COMMAND_STATE_TARGET]
+
+        action_rows = []
+        components = response.components
+        for block in components:
+            component_block = []
+            for c in block:
+                if not isinstance(c, (Component, DeferredComponent)):
+                    raise TypeError(
+                        f"invalid component given, expected type "
+                        f"`Component` or `DeferredComponent` got {type(c)!r}"
+                    )
+
+                if isinstance(c, DeferredComponent):
+                    c = c(app=self)
+
+                data = c.data
+
+                # If its got a url we wont get invoked on a click
+                # so we can ignore setting a reference id.
+                if data.url is None:
+                    reference_id = str(uuid.uuid4())
+                    data.custom_id = f"{data.custom_id}:{reference_id}"
+                    await state.set(reference_id, response.component_context)
+
+                component_block.append(c.data)
+            action_row = ActionRow(components=component_block)
+            action_rows.append(action_row)
+
+        resp = response.dict()
+        del resp["components"]
+        data = ResponseData(**resp, components=action_rows)
+        return ResponsePayload(type=default_response_type, data=data)
 
     @validate_arguments
     def command(
