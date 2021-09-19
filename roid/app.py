@@ -240,7 +240,6 @@ class SlashCommands(FastAPI):
             custom_id, *_ = interaction.data.custom_id.split(":", maxsplit=1)
 
             component = self._components.get(custom_id)
-            print(component)
             if component is None:
                 raise HTTPException(status_code=400, detail="No component found")
 
@@ -467,7 +466,7 @@ class SlashCommands(FastAPI):
                 oneshot=oneshot,
             )
 
-            if url is not None:
+            if url is None:
                 if custom_id in self._components:
                     raise ComponentAlreadyExists(
                         f"component with custom_id {custom_id!r} has already been defined and registered"
