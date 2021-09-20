@@ -49,15 +49,11 @@ def hyperlink(
     """
 
     return DeferredButton(
-        call_pipeline=[
-            dict(
-                style=ButtonStyle.Link,
-                disabled=disabled,
-                label=label,
-                url=url,
-            ),
-            [_null],
-        ],
+        callback=_null,
+        style=ButtonStyle.Link,
+        disabled=disabled,
+        label=label,
+        url=url,
     )
 
 
