@@ -24,13 +24,13 @@ token = os.getenv("BOT_TOKEN")
 app = SlashCommands(application_id, public_key, token)
 
 
-@app.command("echo", "Echo a message.")
-async def wave(message: str):
+@app.command("counter", "Count with numbers!")
+async def count():
     # Make sure you're not sending a ephemeral message if you're planning to
     # delete the response later as it wont work. Roid will silently ignore the request
     # if you do it via the Response class.
     return Response(
-        content=message,
+        content="Counter: 0",
         components=[  # Each internal list represents a new ActionRow.
             [counter, delete_button]
         ],
@@ -39,7 +39,7 @@ async def wave(message: str):
         # Note if you want to access if the response was ephemeral or the parent
         # interaction this is available via the 'ephemeral' and 'parent' keys
         # respectively, automatically.
-        component_context={"message": message},
+        component_context={"count": 1},
     )
 
 

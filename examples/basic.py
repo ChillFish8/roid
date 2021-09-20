@@ -2,7 +2,7 @@
 A very basic example as shown in the README.
 
 This creates two text input commands, one is ran as asynchronously as a coroutine
-the other is ran in a separate thread when invoked.
+the other is ran in a separate thread.
 
 Its important to note that anything callable in roid (Commands, Checks and Components)
 can be ran either as a coroutine or as a threaded function.
@@ -27,19 +27,16 @@ token = os.getenv("BOT_TOKEN")
 app = SlashCommands(application_id, public_key, token)
 
 
-# Commands can be like so but also via a
+# Commands can be defined like so but also via a
 # CommandBlueprint (more on this in other examples.)
 @app.command("echo", "Echo a message.")
-async def wave(message: str):
+async def echo(message: str):
     return Response(content=message, flags=ResponseFlags.EPHEMERAL)
 
 
-# If a command, check or component function is synchronous
-# i.e isn't defined with `async def` then roid will run it in a separate
-# thread. This can catch you out if you have something that doesnt play
-# well with threads e.g. SQLite.
+# Commands defined with `def` instead of `async def` are ran in a separate thread.
 @app.command("echo-sync", "Echo a message with threading.")
-def wave_sync(message: str):
+def echo_sync(message: str):
     return Response(content=message, flags=ResponseFlags.EPHEMERAL)
 
 
