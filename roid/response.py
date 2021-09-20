@@ -242,6 +242,7 @@ class Response:
                     reference_id,
                     {
                         "parent": parent,
+                        "ephemeral": self._payload.flags & ResponseFlags.EPHEMERAL != 0,
                         **self._payload.component_context,
                     },
                     ttl=self._payload.component_context.get("ttl"),
@@ -279,6 +280,7 @@ class Response:
                     reference_id,
                     {
                         "parent": parent,
+                        "ephemeral": self._payload.flags & ResponseFlags.EPHEMERAL != 0,
                         **self._payload.component_context,
                     },
                     ttl=self._payload.component_context.get("ttl"),

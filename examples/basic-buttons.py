@@ -26,8 +26,7 @@ see https://realpython.com/python-async-features/ for more about async
 import os
 import uvicorn
 
-from roid import SlashCommands, Response, ResponseFlags
-from roid.components import ButtonStyle
+from roid import SlashCommands, Response, ResponseFlags, ButtonStyle, InvokeContext
 
 application_id = int(os.getenv("APPLICATION_ID"))
 public_key = os.getenv("PUBLIC_KEY")
@@ -40,13 +39,29 @@ app = SlashCommands(application_id, public_key, token)
 
 @app.command("echo", "Echo a message.")
 async def wave(message: str):
+    # Make sure you're not sending a ephemeral message if you're planning to
+    # delete the response later as it wont work. Roid will silently ignore the request
+    # if you do it via the Response class.
     return Response(
         content=message,
-        flags=ResponseFlags.EPHEMERAL,
+        components=[[delete_button]],  # Each internal list represents a new ActionRow.
+        component_context={"message": message},
     )
 
 
-@app.button("Click Me", style=ButtonStyle.DANGER)
+# Here we define our delete button with the label 'Click Me' and with the
+# style DANGER (red). Notice how we also pass `oneshot=True`
+# If oneshot is set to True the system will automatically remove any
+# passed context from the parent interaction and also prevent users from
+# invoking the function multiple times. Once it's ran once, it can never be
+# ran again.
+@app.button("Click Me", style=ButtonStyle.DANGER, oneshot=True)
+async def delete_button(
+    ctx: InvokeContext,
+):  # This is the data passed from the Response above.
+
+    print(f"deleting button invoked and the echo message was: {ctx['message']}")
+    return Response(delete_parent=True)
 
 
 if __name__ == "__main__":
@@ -58,5 +73,4 @@ if __name__ == "__main__":
     app.register_commands_on_start()
 
     # We use uvicorn in this example but anything that supports an ASGI app would work.
-    uvicorn.run("basic:app")
-
+    uvicorn.run("basic-buttons:app")

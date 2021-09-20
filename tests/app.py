@@ -1,7 +1,7 @@
 import os
 import uvicorn
 
-from roid import SlashCommands, Response, ResponseFlags
+from roid import SlashCommands, Response, ResponseFlags, InvokeContext, ButtonStyle
 
 app = SlashCommands(
     641590528026083338,
@@ -12,12 +12,18 @@ app = SlashCommands(
 
 @app.command("echo", "Echo a message.", guild_id=675647130647658527)
 async def echo(message: str):
-    return Response(content=message, flags=ResponseFlags.EPHEMERAL)
+    return Response(
+        content=message,
+        flags=ResponseFlags.EPHEMERAL,
+        components=[[test]],
+        component_context={"message": message},
+    )
 
 
-@app.command("echo-sync", "Echo a message with threading.", guild_id=675647130647658527)
-def echo_sync(message: str):
-    return Response(content=message, flags=ResponseFlags.EPHEMERAL)
+@app.button("click me", style=ButtonStyle.PRIMARY, oneshot=True)
+async def test(ctx: InvokeContext):
+    print(ctx)
+    return Response(delete_parent=True)
 
 
 if __name__ == "__main__":
