@@ -107,6 +107,8 @@ class SelectValue:
         self.emoji = emoji
 
     def __eq__(self, other):
+        if isinstance(other, list):
+            other = other[0]
         return self.value == other
 
     def __hash__(self):

@@ -23,7 +23,7 @@ application_id = int(os.getenv("APPLICATION_ID"))
 public_key = os.getenv("PUBLIC_KEY")
 token = os.getenv("BOT_TOKEN")
 
-app = SlashCommands(application_id, public_key, token)
+app = SlashCommands(application_id, public_key, token, register_commands=True)
 
 
 class Pages(Enum):
@@ -78,5 +78,4 @@ async def select(
 
 
 if __name__ == "__main__":
-    app.register_commands_on_start()
     uvicorn.run("selects:app")

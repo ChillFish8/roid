@@ -19,7 +19,7 @@ application_id = int(os.getenv("APPLICATION_ID"))
 public_key = os.getenv("PUBLIC_KEY")
 token = os.getenv("BOT_TOKEN")
 
-app = SlashCommands(application_id, public_key, token)
+app = SlashCommands(application_id, public_key, token, register_commands=True)
 
 
 @app.command("counter", "Count with numbers!")
@@ -80,12 +80,4 @@ async def counter(
 
 
 if __name__ == "__main__":
-    # By default we dont want roid to submit the commands for every worker
-    # process, this would get us rate limited too quickly.
-    # Instead we explicitly enable it for the main process via
-    # the '__name__ == "__main__"' block so any workers
-    # uvicorn makes wont also register the commands.
-    app.register_commands_on_start()
-
-    # We use uvicorn in this example but anything that supports an ASGI app would work.
     uvicorn.run("buttons:app")

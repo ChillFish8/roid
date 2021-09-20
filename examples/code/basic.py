@@ -24,7 +24,7 @@ token = os.getenv("BOT_TOKEN")
 
 # We create our app, this is actually just a regular ASGI app
 # but with the `POST /` route reserved.
-app = SlashCommands(application_id, public_key, token)
+app = SlashCommands(application_id, public_key, token, register_commands=True)
 
 
 # Commands can be defined like so but also via a
@@ -41,12 +41,5 @@ def echo_sync(message: str):
 
 
 if __name__ == "__main__":
-    # By default we dont want roid to submit the commands for every worker
-    # process, this would get us rate limited too quickly.
-    # Instead we explicitly enable it for the main process via
-    # the '__name__ == "__main__"' block so any workers
-    # uvicorn makes wont also register the commands.
-    app.register_commands_on_start()
-
     # We use uvicorn in this example but anything that supports an ASGI app would work.
     uvicorn.run("basic:app")
