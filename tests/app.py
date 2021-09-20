@@ -8,7 +8,6 @@ import logging
 from roid import (
     SlashCommands,
     Embed,
-    CommandType,
     SelectValue,
     CommandsBlueprint,
     Response,
@@ -17,7 +16,7 @@ from roid.components import ButtonStyle
 from roid.objects import MemberPermissions
 from roid.helpers import require_user_permissions, hyperlink
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 app = SlashCommands(
     641590528026083338,
@@ -32,11 +31,6 @@ bp = CommandsBlueprint()
 class TestAnimal(Enum):
     Cow = "Cow"
     Pig = "Pig"
-
-
-@app.group("test-group", "oofies 2", guild_id=675647130647658527)
-async def group_test():
-    return Response(content="hi")
 
 
 @require_user_permissions(MemberPermissions.ADMINISTRATOR)
