@@ -50,7 +50,7 @@ def hyperlink(
 
     return DeferredButton(
         callback=_null,
-        style=ButtonStyle.Link,
+        style=ButtonStyle.LINK,
         disabled=disabled,
         label=label,
         url=url,

@@ -60,8 +60,8 @@ class ButtonStyle(IntEnum):
     PRIMARY = auto()
     SECONDARY = auto()
     SUCCESS = auto()
-    Danger = auto()
-    Link = auto()
+    DANGER = auto()
+    LINK = auto()
 
 
 class ComponentContext(BaseModel):
