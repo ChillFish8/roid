@@ -27,6 +27,7 @@ from roid.components import (
     EMOJI_REGEX,
     SelectOption,
     SelectValue,
+    InvokeContext,
 )
 from roid.exceptions import CommandAlreadyExists, ComponentAlreadyExists
 from roid.objects import PartialEmoji
@@ -661,7 +662,7 @@ class SlashCommands(FastAPI):
             spec = inspect.getfullargspec(func)
 
             for param, hint in spec.annotations.items():
-                if hint is Interaction:
+                if hint in (Interaction, InvokeContext):
                     continue
 
                 origin = typing.get_origin(hint)
