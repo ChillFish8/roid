@@ -3,13 +3,14 @@ from typing import Callable, Union, Coroutine, Any
 from roid.callers import OptionalAsyncCallable
 from roid.exceptions import RoidException
 from roid.interactions import Interaction
+from roid.response import Response
 
 SyncOrAsyncCheck = Callable[
     [Interaction], Union[Interaction, Coroutine[Any, Any, Interaction]]
 ]
 
 SyncOrAsyncCheckError = Callable[
-    [Interaction, Exception], Union[Interaction, Coroutine[Any, Any, Interaction]]
+    [Interaction, Exception], Union[Interaction, Coroutine[Any, Any, Response]]
 ]
 
 

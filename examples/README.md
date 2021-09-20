@@ -12,6 +12,7 @@ pip install -r requirements.txt
 - **[Basic](https://github.com/ChillFish8/roid/blob/master/examples/code/basic.py)** - A basic example of sync and async commands with an echo command.
 - **[Buttons](https://github.com/ChillFish8/roid/blob/master/examples/code/buttons.py)** - A example of buttons and state management with a counter command.
 - **[Selects](https://github.com/ChillFish8/roid/blob/master/examples/code/selects.py)** - Experiment with select boxes with a very basic book reader.
+- **[Checks](https://github.com/ChillFish8/roid/blob/master/examples/code/checks.py)** - Middleware-like handlers for manipulating and validating interactions.
 
 ## ✨ Community Showcase
 Got a project built with roid you want to show off? Open a PR to add it! 
