@@ -113,7 +113,7 @@ def require_user_permissions(
     """
     Requires the user has x permissions in order to invoke the command.
 
-    If the user does not have the required permissions then the on_reject function
+    If the user does not have the required permissions then the on_error function
     will be invoked if not set to None otherwise, the default rejection handler
     is used.
 

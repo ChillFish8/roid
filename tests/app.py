@@ -6,7 +6,6 @@ import uvicorn
 from roid import (
     SlashCommands,
     Response,
-    InvokeContext,
     ResponseType,
     Embed,
     SelectValue,
