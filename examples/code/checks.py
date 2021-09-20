@@ -1,16 +1,9 @@
 """
-A very basic example as shown in the README.
+We handle checks here, these are basically like per-command / per-group 
+middleware handlers.
 
-This creates two text input commands, one is ran as asynchronously as a coroutine
-the other is ran in a separate thread.
-
-Its important to note that anything callable in roid (Commands, Checks and Components)
-can be ran either as a coroutine or as a threaded function.
-Generally it's recommended to use async functions how ever to get the most out
-of the efficiency of async.
-
-Make sure to watch out for block code though,
-see https://realpython.com/python-async-features/ for more about async
+Roid already provides some basic helpers like `check` and `require_user_permissions`
+decorators to make your life easier when making them.
 """
 
 import os
@@ -59,7 +52,11 @@ async def custom_check(interaction: Interaction) -> Interaction:
 
 async def on_check_error(_: Interaction, error: Exception) -> Response:
     if isinstance(error, ValueError):
-        return Response(content=str(error), flags=ResponseFlags.EPHEMERAL, type=ResponseType.CHANNEL_MESSAGE_WITH_SOURCE)
+        return Response(
+            content=str(error),
+            flags=ResponseFlags.EPHEMERAL,
+            type=ResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+        )
 
     # If you dont re-raise the error will be ignored.
     raise error
@@ -76,4 +73,4 @@ async def check_permissions():
 
 if __name__ == "__main__":
     # We use uvicorn in this example but anything that supports an ASGI app would work.
-    uvicorn.run("basic:app")
+    uvicorn.run("checks:app")
