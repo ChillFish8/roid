@@ -45,7 +45,7 @@ class Pages(Enum):
     )
 
 
-@app.command("book", "Read a book")
+@app.command("book", "Read a book", guild_id=675647130647658527)
 async def book():
     embed = Embed(title="My book page 1", description=Pages.PAGE_1.value.value)
 
@@ -55,15 +55,10 @@ async def book():
     )
 
 
-# Here we define our delete button with the label '+1' and with the
-# style PRIMARY (burple).
-# The general idea with this button is we just increment a counter and update
-# the message showing how to use the state.
+# Our select component takes the values of our enum and makes them
+# into a list of selectable options.
 @app.select(placeholder="Pick a page, any page!")
-async def select(
-    ctx: InvokeContext,
-    selected_value: Pages,
-):  # This is the data passed from the Response above.
+async def select(selected_value: Pages):
 
     embed = Embed(
         title=f"My book {selected_value.value.label}",
