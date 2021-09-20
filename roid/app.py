@@ -3,19 +3,21 @@ import logging
 import uuid
 import inspect
 import typing
-from enum import Enum
 
 try:
+    orjson_enabled = True
     import orjson as json
 except ImportError:
+    orjson_enabled = False
     import json
 
+from enum import Enum
+from typing import Dict, Type, Callable, Optional, List, Union, Literal
 from nacl.signing import VerifyKey
 from nacl.exceptions import BadSignatureError
-
-from typing import Dict, Type, Callable, Optional, List, Union, Literal
 from fastapi import FastAPI, Request
 from fastapi.exceptions import HTTPException
+from fastapi.responses import JSONResponse, ORJSONResponse
 from pydantic import ValidationError, validate_arguments, constr, conint
 
 from roid.components import (
@@ -98,7 +100,13 @@ class SlashCommands(FastAPI):
                 If no backend is given the Sqlite backend is used.
         """
 
-        super().__init__(**extra, docs_url=None, redoc_url=None)
+        response_class = ORJSONResponse if orjson_enabled else JSONResponse
+        super().__init__(
+            **extra,
+            docs_url=None,
+            redoc_url=None,
+            default_response_class=response_class,
+        )
 
         if state_backend is None:
             state_backend = SqliteBackend(f"__internal_managed_state")
