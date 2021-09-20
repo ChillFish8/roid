@@ -1,3 +1,2 @@
-dotenv
 roid>=0.2.0
 uvicorn
