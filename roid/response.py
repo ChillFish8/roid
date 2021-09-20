@@ -238,11 +238,12 @@ class Response:
             if data.url is None:
                 reference_id = str(uuid.uuid4())
                 data.custom_id = f"{data.custom_id}:{reference_id}"
+                flags = self._payload.flags or 0
                 await state.set(
                     reference_id,
                     {
                         "parent": parent,
-                        "ephemeral": self._payload.flags & ResponseFlags.EPHEMERAL != 0,
+                        "ephemeral": flags & ResponseFlags.EPHEMERAL != 0,
                         **self._payload.component_context,
                     },
                     ttl=self._payload.component_context.get("ttl"),
@@ -276,11 +277,12 @@ class Response:
             if data.url is None:
                 reference_id = str(uuid.uuid4())
                 data.custom_id = f"{data.custom_id}:{reference_id}"
+                flags = self._payload.flags or 0
                 await state.set(
                     reference_id,
                     {
                         "parent": parent,
-                        "ephemeral": self._payload.flags & ResponseFlags.EPHEMERAL != 0,
+                        "ephemeral": flags & ResponseFlags.EPHEMERAL != 0,
                         **self._payload.component_context,
                     },
                     ttl=self._payload.component_context.get("ttl"),
