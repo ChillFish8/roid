@@ -1,2 +1,3 @@
 dotenv
-roid
+roid>=0.1.0
+uvicorn
