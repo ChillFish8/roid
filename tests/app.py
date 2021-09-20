@@ -24,8 +24,7 @@ app = SlashCommands(
     os.getenv("TOKEN"),
 )
 
-
-bp = CommandsBlueprint()
+group = app.group("test-group", "Hmmmm", guild_id=675647130647658527)
 
 
 class TestAnimal(Enum):
@@ -34,10 +33,7 @@ class TestAnimal(Enum):
 
 
 @require_user_permissions(MemberPermissions.ADMINISTRATOR)
-@bp.command(
-    "say-helloo",
-    "oofies",
-)
+@group.command("say-helloo")
 async def test():
     resp = Response(
         embed=Embed(title=f"Hello, world", color=0xFFFFF),
@@ -56,7 +52,7 @@ async def test():
     return resp
 
 
-@bp.button(
+@app.button(
     style=ButtonStyle.PRIMARY,
     label="Delete",
     oneshot=True,
@@ -73,13 +69,11 @@ class TestSelect(Enum):
     Pirate = SelectValue("Or meee!")
 
 
-@bp.select(min_values=1, max_values=3)
+@app.select(min_values=1, max_values=3)
 async def test_selection(choices: List[TestSelect]):
     print(choices)
     return Response(delete_parent=True)
 
-
-app.add_blueprint(bp)
 
 if __name__ == "__main__":
     app.register_commands = True
