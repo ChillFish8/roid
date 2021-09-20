@@ -1,5 +1,6 @@
 """
-Here we extend out basic.py example by adding some general buttons.
+Here we extend out basic.py example by adding some general buttons by making
+a counter command that allows you to +1 to a counter or delete the message.
 
 We start to see some of the magic that roid provides via it's managed state system.
 This will guarantee that your worker processes see the same value across them if
@@ -8,20 +9,6 @@ you could have all sorts of issues and confusing behaviour. Using the managed
 state system you can expect the same behaviour in one process or 1000 processes.
 """
 
-"""
-A very basic example as shown in the README.
-
-This creates two text input commands, one is ran as asynchronously as a coroutine
-the other is ran in a separate thread when invoked.
-
-Its important to note that anything callable in roid (Commands, Checks and Components)
-can be ran either as a coroutine or as a threaded function.
-Generally it's recommended to use async functions how ever to get the most out
-of the efficiency of async.
-
-Make sure to watch out for block code though,
-see https://realpython.com/python-async-features/ for more about async
-"""
 
 import os
 import uvicorn
@@ -44,7 +31,9 @@ async def wave(message: str):
     # if you do it via the Response class.
     return Response(
         content=message,
-        components=[[delete_button]],  # Each internal list represents a new ActionRow.
+        components=[  # Each internal list represents a new ActionRow.
+            [counter, delete_button]
+        ],
         # Here's the really cool bit, anything you pass via component_context will be
         # sent to the component regardless of what process it's running on.
         # Note if you want to access if the response was ephemeral or the parent
@@ -69,20 +58,25 @@ async def delete_button(
     return Response(delete_parent=True)
 
 
-# Here we define our delete button with the label 'Click Me' and with the
-# style DANGER (red). Notice how we also pass `oneshot=True`
-# If oneshot is set to True the system will automatically remove any
-# passed context from the parent interaction and also prevent users from
-# invoking the function multiple times. Once it's ran once, it can never be
-# ran again.
+# Here we define our delete button with the label '+1' and with the
+# style PRIMARY (burple).
+# The general idea with this button is we just increment a counter and update
+# the message showing how to use the state.
 @app.button("+1", style=ButtonStyle.PRIMARY)
 async def counter(
     ctx: InvokeContext,
 ):  # This is the data passed from the Response above.
 
-    count = ctx.get("count", 0)
+    count = ctx.get("count", 0) + 1
 
-    return Response(content=f"Count: {count}", type=ResponseType.UPDATE_MESSAGE)
+    return Response(
+        content=f"Count: {count}",
+        type=ResponseType.UPDATE_MESSAGE,  # Update / edit the message
+        components=[  # We need to re add our components to this 'new message'
+            [counter, delete_button]
+        ],
+        component_context={"count": count},  # Our state is appended to.
+    )
 
 
 if __name__ == "__main__":
