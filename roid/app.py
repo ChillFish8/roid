@@ -60,7 +60,7 @@ class SlashCommands(FastAPI):
         application_id: int,
         application_public_key: str,
         token: str,
-        register_commands: bool = True,
+        register_commands: bool = False,
         state_backend: Optional[StorageBackend] = None,
         **extra,
     ):
@@ -128,6 +128,9 @@ class SlashCommands(FastAPI):
         self.post("/", name="Interaction Events")(self.__root)
         self.on_event("startup")(self._startup)
         self.on_event("shutdown")(self._shutdown)
+
+    def register_commands_on_start(self):
+        self.register_commands = True
 
     @property
     def state(self) -> MultiManagedState:

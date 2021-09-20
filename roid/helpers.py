@@ -136,7 +136,7 @@ def require_user_permissions(
                 f"Did you put the decorators the wrong way around?\n"
             )
 
-        def _permission_check(interaction: Interaction):
+        async def _permission_check(interaction: Interaction):
             if interaction.member is None:
                 return interaction
             if interaction.member.permissions & flags != 0:
