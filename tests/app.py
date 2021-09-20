@@ -17,7 +17,9 @@ async def wave(message: str):
     # if you do it via the Response class.
     return Response(
         content=message,
-        components=[[delete_button]],  # Each internal list represents a new ActionRow.
+        components=[
+            [counter, delete_button]
+        ],  # Each internal list represents a new ActionRow.
         # Here's the really cool bit, anything you pass via component_context will be
         # sent to the component regardless of what process it's running on.
         # Note if you want to access if the response was ephemeral or the parent

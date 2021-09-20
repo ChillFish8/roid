@@ -82,7 +82,7 @@ class Response:
             ]
         ] = None,
         component_context: Optional[Dict[str, Any]] = None,
-        response_type: Optional[ResponseType] = None,
+        type: Optional[ResponseType] = None,
         delete_parent: bool = False,
     ):
         """
@@ -138,7 +138,7 @@ class Response:
 
         self.delete_parent = delete_parent
         self.parent: Optional[Interaction] = None
-        self._response_type = response_type
+        self._response_type = type
         self._payload = DeferredResponsePayload(
             tts=tts,
             allowed_mentions=allowed_mentions,
