@@ -24,7 +24,8 @@ app = SlashCommands(
     os.getenv("TOKEN"),
 )
 
-group = app.group("test-group", "Hmmmm", guild_id=675647130647658527)
+bp = CommandsBlueprint()
+group = bp.group("test-group", "Hmmmm", guild_id=675647130647658527)
 
 
 class TestAnimal(Enum):
@@ -75,6 +76,7 @@ async def test_selection(choices: List[TestSelect]):
     return Response(delete_parent=True)
 
 
+app.add_blueprint(bp)
 if __name__ == "__main__":
     app.register_commands = True
     uvicorn.run("app:app", port=8000, host="0.0.0.0")

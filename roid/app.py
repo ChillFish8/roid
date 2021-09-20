@@ -39,7 +39,7 @@ from roid.response import (
 )
 from roid.http import HttpHandler
 from roid.state import StorageBackend, MultiManagedState, SqliteBackend
-from roid.deferred import CommandsBlueprint, DeferredComponent, DeferredCommand
+from roid.deferred import CommandsBlueprint, DeferredGroupCommand
 
 _log = logging.getLogger("roid-main")
 
@@ -346,11 +346,11 @@ class SlashCommands(FastAPI):
         for component in bp._components:  # noqa
             component(app=self)
 
-    @validate_arguments
+    @validate_arguments(config={"arbitrary_types_allowed": True})
     def group(
         self,
         name: str,
-        description: str = None,
+        description: str,
         *,
         guild_id: int = None,
         guild_ids: List[int] = None,
@@ -362,14 +362,13 @@ class SlashCommands(FastAPI):
         group_description: constr(
             strip_whitespace=True, regex="[a-zA-Z0-9 ]+", min_length=1, max_length=95
         ) = "Select a sub command to run.",
+        existing_commands: Dict[str, DeferredGroupCommand] = None,  # noqa
     ):
         """
-        Registers a command with the given app.
+        Registers a command group with the given app.
 
-        If the command type is either `CommandType.MESSAGE` or `CommandType.USER`
-        there cannot be any description however, if the command type
-        is `CommandType.CHAT_INPUT` then description is required.
-        If either of those conditions are broken a `ValueError` is raised.
+        The description is required.
+        If either the conditions are broken a `ValueError` is raised.
 
         Args:
             name:
@@ -378,8 +377,7 @@ class SlashCommands(FastAPI):
                 section of the interactions documentation.
 
             description:
-                The description of the command. This can only be applied to
-                `CommandType.CHAT_INPUT` commands.
+                The description of the group command.
 
             guild_id:
                 The optional guild id if this is a guild specific command.
@@ -414,6 +412,7 @@ class SlashCommands(FastAPI):
             defer_register=not defer_register,
             group_name=group_name,
             group_description=group_description,
+            existing_commands=existing_commands,
         )
 
         if name in self._commands:

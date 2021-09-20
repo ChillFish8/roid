@@ -19,6 +19,7 @@ from pydantic import BaseModel, constr, validate_arguments
 
 if TYPE_CHECKING:
     from roid.app import SlashCommands
+    from roid.deferred import DeferredGroupCommand
 
 from roid.exceptions import InvalidCommand, CommandAlreadyExists
 from roid.interactions import (
@@ -404,6 +405,16 @@ class Command(OptionalAsyncCallable):
         return func
 
 
+class GroupCommand(Command):
+    def __init__(self, app: SlashCommands, callback, name: str, application_id: int):
+        super().__init__(
+            app, callback, name, application_id, cmd_type=CommandType.CHAT_INPUT
+        )
+
+    def register(self, app: SlashCommands):
+        raise TypeError("group commands cannot be individually registered.")
+
+
 class CommandGroup(Command):
     def __init__(
         self,
@@ -417,7 +428,16 @@ class CommandGroup(Command):
         defer_register: bool = True,
         group_name: str = "command",
         group_description: str = "Select a sub command to run.",
+        existing_commands: Dict[str, DeferredGroupCommand] = None,
     ):
+        if existing_commands is not None:
+            commands = {}
+            for name, deferred in existing_commands.items():
+                commands[name] = deferred(app=app)
+            existing_commands = commands
+        else:
+            existing_commands = {}
+
         super().__init__(
             app=app,
             callback=self._group_invoker,
@@ -434,7 +454,7 @@ class CommandGroup(Command):
         self.group_name = group_name
         self.group_description = group_description
 
-        self._commands: Dict[str, Command] = {}
+        self._commands: Dict[str, GroupCommand] = existing_commands
 
     async def _group_invoker(self, interaction: Interaction, **kwargs):
         sub_command = kwargs.pop(self.group_name)
@@ -483,7 +503,7 @@ class CommandGroup(Command):
     @validate_arguments
     def command(self, name: str):
         """
-        Registers a command with the given app.
+        Registers a group command with the given app.
 
         The command type is always `CommandType.CHAT_INPUT`.
 
@@ -495,12 +515,11 @@ class CommandGroup(Command):
         """
 
         def wrapper(func):
-            cmd = Command(
+            cmd = GroupCommand(
                 app=self.app,
                 callback=func,
                 name=name,
                 application_id=int(self.application_id),
-                cmd_type=CommandType.CHAT_INPUT,
             )
 
             if name in self._commands:

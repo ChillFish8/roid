@@ -1,13 +1,15 @@
 from __future__ import annotations
 
-from typing import List, Union, TYPE_CHECKING, Optional, Callable, Coroutine, Any
+from typing import List, Union, TYPE_CHECKING, Optional, Callable, Coroutine, Any, Dict
 from pydantic import constr, conint
+
+from roid.exceptions import CommandAlreadyExists
 
 if TYPE_CHECKING:
     from roid import CommandType
     from roid.app import SlashCommands
     from roid.components import Component, ButtonStyle
-    from roid.command import Command, CommandContext
+    from roid.command import Command, CommandContext, CommandGroup
     from roid.checks import CommandCheck
     from roid.response import ResponsePayload
     from roid.interactions import Interaction
@@ -243,10 +245,266 @@ class DeferredCommand(DeferredAppItem):
         return super().__call__(*args, **kwargs)
 
 
+class DeferredGroupCommand(DeferredCommand):
+    def __init__(
+        self,
+        callback,
+        name: str,
+    ):
+        super().__init__(callback, name, description="Not Used")
+
+    def register(self, app: SlashCommands):
+        raise TypeError("group commands cannot be individually registered.")
+
+
+class DeferredCommandGroup(DeferredAppItem):
+    def __init__(
+        self,
+        name: str,
+        description: str = None,
+        *,
+        guild_id: int = None,
+        guild_ids: List[int] = None,
+        default_permissions: bool = True,
+        defer_register: bool = False,
+        group_name: str = "command",
+        group_description: str = "Select a sub command to run.",
+    ):
+        """
+        Registers a command group with the given app.
+
+        The description is required.
+        If either the conditions are broken a `ValueError` is raised.
+
+        Args:
+            name:
+                The name of the command. This must be unique / follow the general
+                slash command rules as described in the "Application Command Structure"
+                section of the interactions documentation.
+
+            description:
+                The description of the command. This can only be applied to
+                `CommandType.CHAT_INPUT` commands.
+
+            guild_id:
+                The optional guild id if this is a guild specific command.
+
+            guild_ids:
+                An optional list of id's to register this command with multiple guilds.
+
+            default_permissions:
+                Whether the command is enabled by default when the app is added to a guild.
+
+            defer_register:
+                Whether or not to automatically register the command / update the command
+                if needed.
+
+                If set to `False` this will not be automatically registered / updated.
+
+            group_name:
+                The name of the parameter to label the sub commands group select as.
+
+            group_description:
+                The description of the select option for the sub commands.
+        """
+
+        attrs = dict(
+            name=name,
+            description=description,
+            guild_id=guild_id,
+            guild_ids=guild_ids,
+            default_permissions=default_permissions,
+            defer_register=defer_register,
+            group_name=group_name,
+            group_description=group_description,
+        )
+
+        super().__init__(
+            "group",
+            [attrs],
+        )
+
+        self._commands: Dict[str, DeferredGroupCommand] = {}
+        self._initialised: Optional[CommandGroup] = None
+
+    def __call__(self, *args, **kwargs):
+        if self._initialised is not None:
+            return self._initialised.__call__(*args, **kwargs)
+
+        self._call_pipeline[0]["existing_commands"] = self._commands
+        super().__call__(*args, **kwargs)
+
+    @property
+    def ctx(self) -> CommandContext:
+        """
+        Gets the general command context data.
+
+        This is naive of any guild ids registered for this command.
+        """
+
+        return self._initialised.ctx
+
+    def command(self, name: str):
+        """
+        Registers a command with the given app.
+
+        The command type is always `CommandType.CHAT_INPUT`.
+
+        Args:
+            name:
+                The name of the command. This must be unique / follow the general
+                slash command rules as described in the "Application Command Structure"
+                section of the interactions documentation.
+        """
+
+        def wrapper(func):
+            if self._initialised is not None:
+                return self._initialised.command(name=name)(func)
+
+            cmd = DeferredGroupCommand(
+                callback=func,
+                name=name,
+            )
+
+            self._commands[name] = cmd
+
+            return cmd
+
+        return wrapper
+
+    def add_check(self, check: CommandCheck, *, at: int = -1):
+        """
+        Adds a check object to the command's check pipeline.
+
+        Checks are ran in the order they are added and can directly
+        modify the interaction data passed to the following checks.
+
+        Args:
+            check:
+                The check object itself.
+
+            at:
+                The desired index to insert the check at.
+                If the index is beyond the current length of the pipeline
+                the check is appended to the end.
+        """
+
+        if self._initialised is not None:
+            self._initialised.add_check(check, at=at)
+        self._call_pipeline.append(CallDeferredAttr("add_check", check=check, at=at))
+
+    def register(self, app: SlashCommands):
+        """
+        Register the command with the given app.
+
+        If any guild ids are given these are registered as specific
+        guild commands rather than as a global command.
+
+        Args:
+            app:
+                The slash commands app which the commands
+                should be registered to.
+        """
+
+        if self._initialised is not None:
+            return self._initialised.register(app)
+        raise TypeError(f"deferred command is not initialised yet.")
+
+    def error(
+        self,
+        func: Callable[[Interaction, Exception], Coroutine[Any, Any, ResponsePayload]],
+    ):
+        """
+        Maps the given error handling coroutine function to the commands general
+        error handler.
+
+        This will override the existing error callback.
+
+        Args:
+            func:
+                The function callback itself, this can be either a coroutine function
+                or a regular sync function (sync functions will be ran in a new
+                thread.)
+        """
+
+        if self._initialised is not None:
+            self._initialised.error(func)
+        self._call_pipeline.append(CallDeferredAttr("error", func))
+
+        return func
+
+
 class CommandsBlueprint:
     def __init__(self):
         self._commands: List[DeferredCommand] = []
         self._components: List[DeferredComponent] = []
+
+    def group(
+        self,
+        name: str,
+        description: str,
+        *,
+        guild_id: int = None,
+        guild_ids: List[int] = None,
+        default_permissions: bool = True,
+        defer_register: bool = False,
+        group_name: str = "command",
+        group_description: str = "Select a sub command to run.",
+    ):
+        """
+        Registers a command with the given app.
+
+        If the command type is either `CommandType.MESSAGE` or `CommandType.USER`
+        there cannot be any description however, if the command type
+        is `CommandType.CHAT_INPUT` then description is required.
+        If either of those conditions are broken a `ValueError` is raised.
+
+        Args:
+            name:
+                The name of the command. This must be unique / follow the general
+                slash command rules as described in the "Application Command Structure"
+                section of the interactions documentation.
+
+            description:
+                The description of the command. This can only be applied to
+                `CommandType.CHAT_INPUT` commands.
+
+            guild_id:
+                The optional guild id if this is a guild specific command.
+
+            guild_ids:
+                An optional list of id's to register this command with multiple guilds.
+
+            default_permissions:
+                Whether the command is enabled by default when the app is added to a guild.
+
+            defer_register:
+                Whether or not to automatically register the command / update the command
+                if needed.
+
+                If set to `False` this will not be automatically registered / updated.
+
+            group_name:
+                The name of the parameter to label the sub commands group select as.
+
+            group_description:
+                The description of the select option for the sub commands.
+        """
+
+        cmd = DeferredCommandGroup(
+            name=name,
+            description=description,
+            guild_id=guild_id,
+            guild_ids=guild_ids,
+            default_permissions=default_permissions,
+            defer_register=not defer_register,
+            group_name=group_name,
+            group_description=group_description,
+        )
+
+        self._commands.append(cmd)  # noqa
+
+        return cmd
 
     def command(
         self,
