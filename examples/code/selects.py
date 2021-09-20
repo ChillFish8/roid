@@ -14,7 +14,6 @@ from roid import (
     SlashCommands,
     Response,
     ResponseType,
-    InvokeContext,
     Embed,
     SelectValue,
 )
