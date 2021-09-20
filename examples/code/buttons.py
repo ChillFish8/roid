@@ -19,8 +19,6 @@ application_id = int(os.getenv("APPLICATION_ID"))
 public_key = os.getenv("PUBLIC_KEY")
 token = os.getenv("BOT_TOKEN")
 
-# We create our app, this is actually just a regular ASGI app
-# but with the `POST /` route reserved.
 app = SlashCommands(application_id, public_key, token)
 
 
@@ -44,8 +42,10 @@ async def count():
 
 
 # Here we define our delete button with the label 'Click Me' and with the
-# style DANGER (red). Notice how we also pass `oneshot=True`
-# If oneshot is set to True the system will automatically remove any
+# style DANGER (red).
+#
+# Notice how we also pass `oneshot=True`
+# if oneshot is set to True the system will automatically remove any
 # passed context from the parent interaction and also prevent users from
 # invoking the function multiple times. Once it's ran once, it can never be
 # ran again.
@@ -88,4 +88,4 @@ if __name__ == "__main__":
     app.register_commands_on_start()
 
     # We use uvicorn in this example but anything that supports an ASGI app would work.
-    uvicorn.run("basic-buttons:app")
+    uvicorn.run("buttons:app")
