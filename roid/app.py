@@ -29,7 +29,7 @@ from roid.components import (
 )
 from roid.exceptions import CommandAlreadyExists, ComponentAlreadyExists
 from roid.objects import PartialEmoji
-from roid.command import CommandType, Command
+from roid.command import CommandType, Command, CommandGroup
 from roid.interactions import InteractionType, Interaction
 from roid.error_handlers import KNOWN_ERRORS
 from roid.response import (
@@ -113,7 +113,7 @@ class SlashCommands(FastAPI):
         self._token = token
         self._global_error_handlers = KNOWN_ERRORS
 
-        self._commands: Dict[str, Command] = {}
+        self._commands: Dict[str, Union[Command, CommandGroup]] = {}
         self._components: Dict[str, Component] = {}
         self._http = HttpHandler(application_id, token)
 
@@ -346,6 +346,81 @@ class SlashCommands(FastAPI):
 
         for component in bp._components:  # noqa
             component(app=self)
+
+    @validate_arguments
+    def group(
+        self,
+        name: str,
+        description: str = None,
+        *,
+        guild_id: int = None,
+        guild_ids: List[int] = None,
+        default_permissions: bool = True,
+        defer_register: bool = False,
+    ):
+        """
+        Registers a command with the given app.
+
+        If the command type is either `CommandType.MESSAGE` or `CommandType.USER`
+        there cannot be any description however, if the command type
+        is `CommandType.CHAT_INPUT` then description is required.
+        If either of those conditions are broken a `ValueError` is raised.
+
+        Args:
+            name:
+                The name of the command. This must be unique / follow the general
+                slash command rules as described in the "Application Command Structure"
+                section of the interactions documentation.
+
+            description:
+                The description of the command. This can only be applied to
+                `CommandType.CHAT_INPUT` commands.
+
+            guild_id:
+                The optional guild id if this is a guild specific command.
+
+            guild_ids:
+                An optional list of id's to register this command with multiple guilds.
+
+            default_permissions:
+                Whether the command is enabled by default when the app is added to a guild.
+
+            defer_register:
+                Whether or not to automatically register the command / update the command
+                if needed.
+
+                If set to `False` this will not be automatically registered / updated.
+        """
+
+        if type in (CommandType.MESSAGE, CommandType.USER) and description is not None:
+            raise ValueError(f"only CHAT_INPUT types can have a set description.")
+        elif type is CommandType.CHAT_INPUT and description is None:
+            raise ValueError(
+                f"missing required field 'description' for CHAT_INPUT commands."
+            )
+
+        def wrapper(func):
+            cmd = CommandGroup(
+                app=self,
+                callback=func,
+                name=name,
+                description=description,
+                application_id=self.application_id,
+                guild_id=guild_id,
+                guild_ids=guild_ids,
+                default_permissions=default_permissions,
+                defer_register=not defer_register,
+            )
+
+            if name in self._commands:
+                raise CommandAlreadyExists(
+                    f"command with name {name!r} has already been defined and registered"
+                )
+            self._commands[name] = cmd
+
+            return cmd
+
+        return wrapper
 
     @validate_arguments
     def command(

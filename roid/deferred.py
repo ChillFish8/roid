@@ -252,7 +252,7 @@ class CommandsBlueprint:
         self,
         name: str,
         description: Optional[str] = None,
-        default_permissions: bool = False,
+        default_permissions: bool = True,
         guild_id: Optional[int] = None,
         guild_ids: Optional[List[int]] = None,
         type: Optional[CommandType] = None,

@@ -1,6 +1,6 @@
 import os
 from enum import Enum
-from typing import List, Literal
+from typing import List
 
 import uvicorn
 import logging
@@ -17,7 +17,7 @@ from roid.components import ButtonStyle
 from roid.objects import MemberPermissions
 from roid.helpers import require_user_permissions, hyperlink
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 
 app = SlashCommands(
     641590528026083338,
@@ -34,12 +34,15 @@ class TestAnimal(Enum):
     Pig = "Pig"
 
 
+@app.group("test-group", "oofies 2", guild_id=675647130647658527)
+async def group_test():
+    return Response(content="hi")
+
+
 @require_user_permissions(MemberPermissions.ADMINISTRATOR)
 @bp.command(
-    "say-hello",
+    "say-helloo",
     "oofies",
-    type=CommandType.CHAT_INPUT,
-    guild_id=675647130647658527,
 )
 async def test():
     resp = Response(
@@ -85,4 +88,5 @@ async def test_selection(choices: List[TestSelect]):
 app.add_blueprint(bp)
 
 if __name__ == "__main__":
+    app.register_commands = True
     uvicorn.run("app:app", port=8000, host="0.0.0.0")

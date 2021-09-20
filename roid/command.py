@@ -15,12 +15,12 @@ from typing import (
     Set,
     TYPE_CHECKING,
 )
-from pydantic import BaseModel, constr
+from pydantic import BaseModel, constr, validate_arguments
 
 if TYPE_CHECKING:
     from roid.app import SlashCommands
 
-from roid.exceptions import InvalidCommand
+from roid.exceptions import InvalidCommand, CommandAlreadyExists
 from roid.interactions import (
     Interaction,
     CommandType,
@@ -402,3 +402,168 @@ class Command(OptionalAsyncCallable):
         """
         self._register_error_handler(func)
         return func
+
+
+# class CommandGroup(OptionalAsyncCallable):
+#     def __init__(
+#         self,
+#         app: SlashCommands,
+#         callback,
+#         name: str,
+#         application_id: int,
+#         description: Optional[str] = None,
+#         default_permissions: bool = False,
+#         guild_id: Optional[int] = None,
+#         guild_ids: Optional[List[int]] = None,
+#         defer_register: bool = True,
+#         group_name: str = "sub-command",
+#         group_description: str = "Select a sub command to run.",
+#     ):
+#         super().__init__(
+#             callback=callback,
+#             on_error=default_on_error,
+#             validate=True,
+#         )
+#
+#         self.app = app
+#
+#         self.name = name
+#         self.description = description
+#         self.application_id = application_id
+#         self.default_permission = default_permissions
+#         self.defer_register = defer_register
+#         self.group_name = group_name
+#         self.group_description = group_description
+#
+#         self._commands: Dict[str, Command] = {}
+#
+#         if guild_id is not None and guild_ids is None:
+#             self.guild_ids = {
+#                 guild_id,
+#             }
+#         elif guild_id is None and guild_ids is not None:
+#             self.guild_ids = set(guild_ids)
+#         else:
+#             self.guild_ids: Optional[Set[int]] = None
+#
+#     @property
+#     def ctx(self) -> CommandContext:
+#         """
+#         Gets the general command context data.
+#
+#         This is naive of any guild ids registered for this command.
+#         """
+#
+#         options = []
+#         for command in self._commands.values():
+#             opt = CommandOption(
+#                 type=CommandOptionType.SUB_COMMAND,
+#                 name=command.name,
+#                 description=command.description,
+#                 options=command.options,
+#             )
+#
+#             options.append(opt)
+#
+#         return CommandContext(
+#             type=CommandType.CHAT_INPUT,
+#             name=self.name,
+#             description=self.description,
+#             default_permission=self.default_permission,
+#             application_id=str(self.application_id),
+#             options=[
+#                 CommandOption(
+#                     type=CommandOptionType.SUB_COMMAND_GROUP,
+#                     options=options,
+#                     name=self.group_name,
+#                     description=self.group_description,
+#                 )
+#             ],
+#         )
+#
+#     async def register(self, app: SlashCommands):
+#         """
+#         Register the command  with the given app.
+#
+#         If any guild ids are given these are registered as specific
+#         guild commands rather than as a global command.
+#
+#         Args:
+#             app:
+#                 The slash commands app which the commands
+#                 should be registered to.
+#         """
+#
+#         ctx = self.ctx
+#
+#         if self.guild_ids is None:
+#             await app._http.register_command(None, ctx)
+#             return
+#
+#         for guild_id in self.guild_ids:
+#             ctx.guild_id = guild_id
+#             await app._http.register_command(guild_id, ctx)
+#
+#     @validate_arguments
+#     def command(self, name: str, description: str = None):
+#         """
+#         Registers a command with the given app.
+#
+#         The command type is always `CommandType.CHAT_INPUT`.
+#
+#         Args:
+#             name:
+#                 The name of the command. This must be unique / follow the general
+#                 slash command rules as described in the "Application Command Structure"
+#                 section of the interactions documentation.
+#
+#             description:
+#                 The description of the command. This can only be applied to
+#                 `CommandType.CHAT_INPUT` commands.
+#         """
+#         if type in (CommandType.MESSAGE, CommandType.USER) and description is not None:
+#             raise ValueError(f"only CHAT_INPUT types can have a set description.")
+#         elif type is CommandType.CHAT_INPUT and description is None:
+#             raise ValueError(
+#                 f"missing required field 'description' for CHAT_INPUT commands."
+#             )
+#
+#         def wrapper(func):
+#             cmd = Command(
+#                 app=self.app,
+#                 callback=func,
+#                 name=name,
+#                 description=description,
+#                 application_id=self.application_id,
+#                 cmd_type=CommandType.CHAT_INPUT,
+#             )
+#
+#             if name in self._commands:
+#                 raise CommandAlreadyExists(
+#                     f"command with name {name!r} has already been defined and registered"
+#                 )
+#             self._commands[name] = cmd
+#
+#             return cmd
+#
+#         return wrapper
+#
+#     def error(
+#         self,
+#         func: Callable[[Interaction, Exception], Coroutine[Any, Any, ResponsePayload]],
+#     ):
+#         """
+#         Maps the given error handling coroutine function to the commands general
+#         error handler.
+#
+#         This will override the existing error callback.
+#
+#         Args:
+#             func:
+#                 The function callback itself, this can be either a coroutine function
+#                 or a regular sync function (sync functions will be ran in a new
+#                 thread.)
+#         """
+#         self._register_error_handler(func)  # Man it just works, Life is good.
+#         return func
+#
