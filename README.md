@@ -19,6 +19,8 @@ You can get started with the following options, most of the public API is type h
 and a lot of the framework depends around this so you should be able to stand on your
 own two feet reasonable quickly.
 
+- **[Examples](https://github.com/ChillFish8/roid/tree/master/roid)** are the best / only place to start.
+
 ## ✨ Basic Example
 ```py
 import os
@@ -32,12 +34,25 @@ token = os.getenv("BOT_TOKEN")
 
 app = roid.SlashCommands(application_id, public_key, token)
 
+# We can create async commands
+@app.command("echo", "Echo a message.", guild_id=675647130647658527)
+async def echo(message: str):
+    return Response(content=message, flags=ResponseFlags.EPHEMERAL)
+
+
+# Or sync commands which are ran in another thread.
+# While this is not advised for everything, we do provide threadsafe interfaces
+# to the state management system.
+@app.command("echo-sync", "Echo a message with threading.", guild_id=675647130647658527)
+def echo_sync(message: str):
+    return Response(content=message, flags=ResponseFlags.EPHEMERAL)
+
 
 if __name__ == "__main__":
-    app.
+    app.register_commands_on_start()
+    uvicorn.run("app:app", port=8000)
 
 ```
-- **[Examples](https://github.com/ChillFish8/roid/tree/master/roid)** are the best / only place to start.
 
 ## ❤️ Developer Note
 Please note that this library is largely designed around what we need the framework to do
