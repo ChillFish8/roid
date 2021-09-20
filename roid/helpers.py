@@ -17,7 +17,7 @@ from roid.components import ButtonStyle
 from roid.objects import MemberPermissions
 from roid.response import ResponsePayload
 from roid.interactions import Interaction
-from roid.deferred import DeferredButton
+from roid.deferred import DeferredButton, DeferredCommand
 
 
 def _null():
@@ -58,7 +58,7 @@ def hyperlink(
 
 
 @validate_arguments
-def check(cb: SyncOrAsyncCheck, on_reject: Optional[SyncOrAsyncCheckError] = None):
+def check(cb: SyncOrAsyncCheck, on_error: Optional[SyncOrAsyncCheckError] = None):
     """
     Creates a command check for a given function with a optional rejection catcher.
 
@@ -67,7 +67,7 @@ def check(cb: SyncOrAsyncCheck, on_reject: Optional[SyncOrAsyncCheckError] = Non
     Args:
         cb:
             The callback to be invoked to do the check itself.
-        on_reject:
+        on_error:
             The optional callback that is invoked should the check fail.
             If this is present the response returned will be sent instead
             of anything else.
@@ -75,14 +75,14 @@ def check(cb: SyncOrAsyncCheck, on_reject: Optional[SyncOrAsyncCheckError] = Non
     """
 
     def wrapper(func: Command) -> Command:
-        if not isinstance(func, Command):
+        if not isinstance(func, (Command, DeferredCommand)):
             raise TypeError(
                 f"cannot add check to {func!r}, "
                 f"checks can only be applied to roid.Command's.\n"
                 f"Did you put the decorators the wrong way around?\n"
             )
 
-        func.add_check(CommandCheck(cb, on_reject))
+        func.add_check(CommandCheck(cb, on_error))
 
         return func
 
@@ -108,7 +108,7 @@ class UserMissingPermissions(CheckError):
 @validate_arguments
 def require_user_permissions(
     flags: int,
-    on_reject: Optional[Callable[[Interaction], ResponsePayload]] = None,
+    on_error: Optional[Callable[[Interaction], ResponsePayload]] = None,
 ):
     """
     Requires the user has x permissions in order to invoke the command.
@@ -121,7 +121,7 @@ def require_user_permissions(
         flags:
             The given permission flags. This should be an integer which can be made
             from taking the bitwise OR of several MemberPermissions.
-        on_reject:
+        on_error:
             The callback to be invoked should the check fail, if this is None the
             callback is ignore.
 
@@ -129,7 +129,7 @@ def require_user_permissions(
     """
 
     def wrapper(func):
-        if not isinstance(func, Command):
+        if not isinstance(func, (Command, DeferredCommand)):
             raise TypeError(
                 f"cannot add permissions check to {func!r}, "
                 f"checks can only be applied to roid.Command's.\n"
@@ -152,7 +152,7 @@ def require_user_permissions(
                 f"You are missing the required permissions: {', '.join(missing)}"
             )
 
-        check(_permission_check, on_reject)(func)
+        check(_permission_check, on_error)(func)
 
         return func
 

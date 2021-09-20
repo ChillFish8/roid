@@ -5,11 +5,17 @@ from typing import List, Literal
 import uvicorn
 import logging
 
-from roid import SlashCommands, Embed, CommandType, SelectValue
+from roid import (
+    SlashCommands,
+    Embed,
+    CommandType,
+    SelectValue,
+    CommandsBlueprint,
+    Response,
+)
 from roid.components import ButtonStyle
 from roid.objects import MemberPermissions
 from roid.helpers import require_user_permissions, hyperlink
-from roid.response import Response
 
 logging.basicConfig(level=logging.INFO)
 
@@ -20,13 +26,16 @@ app = SlashCommands(
 )
 
 
+bp = CommandsBlueprint()
+
+
 class TestAnimal(Enum):
     Cow = "Cow"
     Pig = "Pig"
 
 
 @require_user_permissions(MemberPermissions.ADMINISTRATOR)
-@app.command(
+@bp.command(
     "say-hello",
     "oofies",
     type=CommandType.CHAT_INPUT,
@@ -50,7 +59,7 @@ async def test():
     return resp
 
 
-@app.button(
+@bp.button(
     style=ButtonStyle.PRIMARY,
     label="Delete",
     oneshot=True,
@@ -67,11 +76,13 @@ class TestSelect(Enum):
     Pirate = SelectValue("Or meee!")
 
 
-@app.select(min_values=1, max_values=3)
+@bp.select(min_values=1, max_values=3)
 async def test_selection(choices: List[TestSelect]):
     print(choices)
     return Response(delete_parent=True)
 
+
+app.add_blueprint(bp)
 
 if __name__ == "__main__":
     uvicorn.run("app:app", port=8000, host="0.0.0.0")

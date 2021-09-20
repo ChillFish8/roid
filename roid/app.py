@@ -40,7 +40,7 @@ from roid.response import (
 )
 from roid.http import HttpHandler
 from roid.state import StorageBackend, MultiManagedState, SqliteBackend
-
+from roid.deferred import CommandsBlueprint, DeferredComponent, DeferredCommand
 
 _log = logging.getLogger("roid-main")
 
@@ -332,6 +332,20 @@ class SlashCommands(FastAPI):
             f"expected either: {ResponsePayload!r}, "
             f"{ResponseData!r} or {Response!r} return type."
         )
+
+    def add_blueprint(self, bp: CommandsBlueprint):
+        """
+        Registers all commands and components linked
+        to the blueprint with the application.
+
+        This resolves all deferred components in the process.
+        """
+
+        for command in bp._commands:  # noqa
+            command(app=self)
+
+        for component in bp._components:  # noqa
+            component(app=self)
 
     @validate_arguments
     def command(

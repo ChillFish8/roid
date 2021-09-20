@@ -226,7 +226,10 @@ class Response:
 
         if isinstance(block, (Component, DeferredComponent)):
             if isinstance(block, DeferredComponent):
-                block = block(app=app)
+                if block._initialised is None:  # noqa
+                    block = block(app=app)
+                else:
+                    block = block._initialised  # noqa
 
             data = block.data.copy()
 
@@ -246,17 +249,20 @@ class Response:
 
             return ActionRow(components=[data])
 
-        for c in block:
-            if not isinstance(c, (Component, DeferredComponent)):
+        for component in block:
+            if not isinstance(component, (Component, DeferredComponent)):
                 raise TypeError(
                     f"invalid component given, expected type "
-                    f"`Component` or `DeferredComponent` got {type(c)!r}"
+                    f"`Component` or `DeferredComponent` got {type(component)!r}"
                 )
 
-            if isinstance(c, DeferredComponent):
-                c = c(app=app)
+            if isinstance(component, DeferredComponent):
+                if component._initialised is None:  # noqa
+                    component = component(app=app)
+                else:
+                    component = component._initialised  # noqa
 
-            data = c.data.copy()
+            data = component.data.copy()
 
             if data.type == ComponentType.SELECT_MENU and len(component_block) > 0:
                 raise ValueError(

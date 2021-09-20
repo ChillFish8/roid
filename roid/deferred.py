@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import List, Union, TYPE_CHECKING, Optional, Callable, Coroutine, Any
-from pydantic import validate_arguments, constr, conint
+from pydantic import constr, conint
 
 if TYPE_CHECKING:
     from roid import CommandType
@@ -91,7 +91,7 @@ class DeferredButton(DeferredComponent):
 
 
 class DeferredSelect(DeferredComponent):
-    """A deferred component which is already set to target the button method."""
+    """A deferred component which is already set to target the select method."""
 
     def __init__(
         self,
