@@ -231,33 +231,41 @@ class Component(OptionalAsyncCallable):
 
     async def __call__(self, interaction: Interaction) -> Any:
         try:
-            resp, parent, ephemeral = await self._invoke(interaction)
+            resp, ctx = await self._invoke(interaction)
         except Exception as e:
             if self._on_error is None:
                 raise e from None
-            resp, parent, ephemeral = await self._invoke_error_handler(interaction, e)
+            resp, ctx = await self._invoke_error_handler(interaction, e)
+
+        ephemeral = ctx.get("ephemeral", False)
+        parent = ctx.get("parent")
+        reference_id = ctx.pop("reference_id", None)
 
         if (not ephemeral) and resp.delete_parent and (parent is not None):
+            if reference_id is not None:  # cleanup our state
+                await self.app.state[COMMAND_STATE_TARGET].remove(reference_id)
+
             await self.app._http.delete_interaction_message(parent.token)
+
+        if resp._payload.component_context is not None:
+            resp._payload.component_context = {**resp._payload.component_context, **ctx}
 
         return resp
 
-    async def _invoke(
-        self, interaction: Interaction
-    ) -> Tuple[Response, Interaction, bool]:
-        kwargs, parent, ephemeral = await self._get_kwargs(interaction)
+    async def _invoke(self, interaction: Interaction) -> Tuple[Response, InvokeContext]:
+        kwargs, ctx = await self._get_kwargs(interaction)
 
         if self._callback_is_coro:
-            return await self._callback(**kwargs), parent, ephemeral
+            return await self._callback(**kwargs), ctx
 
         partial = functools.partial(self._callback, **kwargs)
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, partial), parent, ephemeral
+        return await loop.run_in_executor(None, partial), ctx
 
     async def _get_kwargs(
         self,
         interaction: Interaction,
-    ) -> Tuple[dict, Optional[Interaction], bool]:
+    ) -> Tuple[dict, InvokeContext]:
         _, *reference_id = interaction.data.custom_id.split(":", maxsplit=1)
 
         if len(reference_id) == 0:
@@ -285,9 +293,9 @@ class Component(OptionalAsyncCallable):
         if self._ctx.options is not None and interaction.data.values is not None:
             kwargs[self._target_options_parameter] = interaction.data.values
 
-        if ctx is None:
-            ephemeral = False
+        if ctx is not None:
+            ctx["reference_id"] = reference_id
         else:
-            ephemeral = ctx.get("ephemeral", False)
+            ctx = {"reference_id": reference_id}
 
-        return kwargs, ctx and ctx.get("parent"), ephemeral
+        return kwargs, ctx

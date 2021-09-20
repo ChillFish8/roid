@@ -17,9 +17,9 @@ async def wave(message: str):
     # if you do it via the Response class.
     return Response(
         content=message,
-        components=[
+        components=[  # Each internal list represents a new ActionRow.
             [counter, delete_button]
-        ],  # Each internal list represents a new ActionRow.
+        ],
         # Here's the really cool bit, anything you pass via component_context will be
         # sent to the component regardless of what process it's running on.
         # Note if you want to access if the response was ephemeral or the parent
@@ -55,9 +55,16 @@ async def counter(
     ctx: InvokeContext,
 ):  # This is the data passed from the Response above.
 
-    count = ctx.get("count", 0)
+    count = ctx.get("count", 0) + 1
 
-    return Response(content=f"Count: {count}", type=ResponseType.UPDATE_MESSAGE)
+    return Response(
+        content=f"Count: {count}",
+        type=ResponseType.UPDATE_MESSAGE,  # Update / edit the message
+        components=[  # We need to re add our components to this 'new message'
+            [counter, delete_button]
+        ],
+        component_context={"count": count},
+    )
 
 
 if __name__ == "__main__":
