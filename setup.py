@@ -13,7 +13,7 @@ with open("roid/__version__.py") as f:
 if not version:
     raise RuntimeError("version is not set")
 
-with open("README.md") as f:
+with open("README.md", encoding="UTF-8") as f:
     readme = f.read()
 
 extras_require = {
