@@ -1,5 +1,0 @@
-httpx[http2]
-fastapi
-aioredis
-PyNaCl
-orjson

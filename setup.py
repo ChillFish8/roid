@@ -1,9 +1,6 @@
 import re
 from setuptools import setup
 
-requirements = []
-with open("requirements.txt") as f:
-    requirements = f.read().splitlines()
 
 with open("roid/__version__.py") as f:
     version = re.search(
@@ -34,7 +31,13 @@ setup(
     url="https://github.com/ChillFish8/roid",
     author="ChillFish8",
     packages=packages,
-    install_requires=requirements,
+    install_requires=[
+        "httpx[http2]",
+        "fastapi",
+        "aioredis",
+        "PyNaCl",
+        "orjson",
+    ],
     extras_require=extras_require,
     include_package_data=True,
     python_requires=">=3.8.0",
