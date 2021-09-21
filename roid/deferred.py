@@ -57,6 +57,29 @@ class DeferredAppItem:
 class DeferredComponent(DeferredAppItem):
     """A identifier type for deferring components."""
 
+    def error(
+        self,
+        func: Callable[[Interaction, Exception], Coroutine[Any, Any, ResponsePayload]],
+    ):
+        """
+        Maps the given error handling coroutine function to the commands general
+        error handler.
+
+        This will override the existing error callback.
+
+        Args:
+            func:
+                The function callback itself, this can be either a coroutine function
+                or a regular sync function (sync functions will be ran in a new
+                thread.)
+        """
+
+        if self._initialised is not None:
+            self._initialised.error(func)
+        self._call_pipeline.append(CallDeferredAttr("error", func))
+
+        return func
+
 
 class DeferredButton(DeferredComponent):
     """A deferred component which is already set to target the button method."""

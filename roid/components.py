@@ -231,13 +231,13 @@ class Component(OptionalAsyncCallable):
     def __hash__(self):
         return hash(self._ctx.custom_id)
 
-    async def __call__(self, interaction: Interaction) -> Any:
+    async def __call__(self, app: SlashCommands, interaction: Interaction) -> Any:
         try:
-            resp, ctx = await self._invoke(interaction)
+            resp, ctx = await self._invoke(app, interaction)
         except Exception as e:
             if self._on_error is None:
                 raise e from None
-            resp, ctx = await self._invoke_error_handler(interaction, e)
+            resp, ctx = await self._invoke_error_handler(app, interaction, e)
 
         ephemeral = ctx.get("ephemeral", False)
         parent = ctx.get("parent")
@@ -254,8 +254,10 @@ class Component(OptionalAsyncCallable):
 
         return resp
 
-    async def _invoke(self, interaction: Interaction) -> Tuple[Response, InvokeContext]:
-        kwargs, ctx = await self._get_kwargs(interaction)
+    async def _invoke(
+        self, app: SlashCommands, interaction: Interaction
+    ) -> Tuple[Response, InvokeContext]:
+        kwargs, ctx = await self._get_kwargs(app, interaction)
 
         if self._callback_is_coro:
             return await self._callback(**kwargs), ctx
@@ -266,6 +268,7 @@ class Component(OptionalAsyncCallable):
 
     async def _get_kwargs(
         self,
+        app: SlashCommands,
         interaction: Interaction,
     ) -> Tuple[dict, InvokeContext]:
         _, *reference_id = interaction.data.custom_id.split(":", maxsplit=1)
@@ -278,7 +281,7 @@ class Component(OptionalAsyncCallable):
         state = self.app.state[COMMAND_STATE_TARGET]
 
         ctx = await state.get(reference_id)
-        kwargs = {}
+        kwargs = await super()._get_kwargs(app, interaction)
         if self._pass_context_to is not None and ctx is not None:
             kwargs[self._pass_context_to] = InvokeContext(reference_id, state, **ctx)
 
