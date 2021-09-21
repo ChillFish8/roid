@@ -1,4 +1,9 @@
-from typing import Callable, Union, Coroutine, Any
+from __future__ import annotations
+
+from typing import Callable, Union, Coroutine, Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from roid import SlashCommands
 
 from roid.callers import OptionalAsyncCallable
 from roid.exceptions import RoidException
@@ -19,5 +24,7 @@ class CheckError(RoidException):
 
 
 class CommandCheck(OptionalAsyncCallable):
-    async def __call__(self, interaction: Interaction) -> Interaction:
-        return await super().__call__(interaction)
+    async def __call__(
+        self, app: SlashCommands, interaction: Interaction
+    ) -> Interaction:
+        return await super().__call__(app, interaction)

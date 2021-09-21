@@ -141,18 +141,9 @@ class Command(OptionalAsyncCallable):
         # We dont want to be producing options for these special cases
         # so we also remove them from the annotations.
         self._pass_target: Tuple[PassTarget, str] = (PassTarget.NONE, "_")
-        self._pass_app = False
         for param, type_ in self.annotations.copy().items():
             if name == "return":
                 continue
-
-            try:
-                if type_.__name__ == SlashCommands:
-                    self._pass_app = True
-                    del self.annotations[param]
-                    continue
-            except AttributeError:
-                pass
 
             if type_ is PartialMessage:
                 del self.annotations[param]
@@ -355,7 +346,7 @@ class Command(OptionalAsyncCallable):
         else:
             self._checks_pipeline.append(check)
 
-    async def _get_kwargs(self, interaction: Interaction) -> dict:
+    async def _get_kwargs(self, app: SlashCommands, interaction: Interaction) -> dict:
         """
         Creates the kwarg dictionary for the command to be invoked based off
         of the interaction.
@@ -365,7 +356,7 @@ class Command(OptionalAsyncCallable):
         passed directly.
         """
 
-        kwargs = await super()._get_kwargs(interaction)
+        kwargs = await super()._get_kwargs(app, interaction)
 
         extend = {}
         cmd_type = self.type
@@ -391,14 +382,16 @@ class Command(OptionalAsyncCallable):
 
         return {**kwargs, **extend}
 
-    async def __call__(self, interaction: Interaction) -> ResponsePayload:
+    async def __call__(
+        self, app: SlashCommands, interaction: Interaction
+    ) -> ResponsePayload:
         try:
             for check in self._checks_pipeline:
-                interaction = await check(interaction)
+                interaction = await check(app, interaction)
         except Exception as e:
-            return await self._invoke_error_handler(interaction, e)
+            return await self._invoke_error_handler(app, interaction, e)
 
-        return await self._invoke(interaction)
+        return await self._invoke(app, interaction)
 
     def error(
         self,
@@ -471,7 +464,9 @@ class CommandGroup(Command):
 
         self._commands: Dict[str, GroupCommand] = existing_commands
 
-    async def _group_invoker(self, interaction: Interaction, **kwargs):
+    async def _group_invoker(
+        self, app: SlashCommands, interaction: Interaction, **kwargs
+    ):
         sub_command = kwargs.pop(self.group_name)
 
         if interaction.data.options[0].name == self.group_name:
@@ -482,7 +477,7 @@ class CommandGroup(Command):
                     interaction.data.options.pop(i)
                     break
 
-        return await self._commands[sub_command](interaction)
+        return await self._commands[sub_command](app, interaction)
 
     @property
     def ctx(self) -> CommandContext:

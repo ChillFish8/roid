@@ -272,7 +272,7 @@ class SlashCommands(FastAPI):
         pass_parent: bool = False,
     ) -> ResponsePayload:
         try:
-            resp = await callback(interaction)
+            resp = await callback(self, interaction)
         except Exception as e:
             handler = self._global_error_handlers.get(type(e))
             if handler is None:
