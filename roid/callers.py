@@ -33,14 +33,18 @@ class OptionalAsyncCallable:
         self._on_error = on_error
 
         self._pass_error_app: bool = False
-        for param, hint in inspect.getfullargspec(self._on_error).annotations.items():
-            if param == "return":
-                continue
 
-            if param == "app":
-                self._pass_error_app = True
-                del self.annotations[param]
-                break
+        if self._on_error is not None:
+            for param, hint in inspect.getfullargspec(
+                self._on_error
+            ).annotations.items():
+                if param == "return":
+                    continue
+
+                if param == "app":
+                    self._pass_error_app = True
+                    del self.annotations[param]
+                    break
 
         self.spec = inspect.getfullargspec(callback)
 
