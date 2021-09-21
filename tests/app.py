@@ -19,49 +19,17 @@ app = SlashCommands(
 )
 
 
-class Pages(Enum):
-    PAGE_1 = SelectValue(
-        "Lust: A fast, auto-optimizing image server designed for high throughput and caching.",
-        label="Page 1",
-    )
-    PAGE_2 = SelectValue(
-        "Lnx: A REST based implementation of the tantivy search engine system WIP.",
-        label="Page 2",
-    )
-    PAGE_3 = SelectValue(
-        "ReWrk: A more modern http framework benchmarker supporting HTTP/1 and HTTP/2 benchmarks.",
-        label="Page 3",
-    )
-    PAGE_4 = SelectValue(
-        "Roid: A fast, stateless http slash commands framework for scale. Built by the Crunchy bot team.",
-        label="Page 4",
-    )
-
-
-@app.command("book", "Read a book", guild_id=675647130647658527)
-async def book():
-    embed = Embed(title="My book page 1", description=Pages.PAGE_1.value.value)
-
+@app.command(
+    "add-release-channel",
+    description=(
+        "Add Crunchy's release webhook to a channel of "
+        "your choice to get the latest Anime release details."
+    ),
+    defer_register=False,
+)
+async def add_news_channel() -> Response:
     return Response(
-        embed=embed,
-        components=[select],  # Select menus take up a whole action row.
-    )
-
-
-# Our select component takes the values of our enum and makes them
-# into a list of selectable options.
-@app.select(placeholder="Pick a page, any page!")
-async def select(selected_value: Pages):
-
-    embed = Embed(
-        title=f"My book {selected_value.value.label}",
-        description=selected_value.value.value,
-    )
-
-    return Response(
-        embed=embed,
-        type=ResponseType.UPDATE_MESSAGE,
-        components=[select],
+        content=(f"<:exitment:717784139641651211> All done! I'll send news to "),
     )
 
 

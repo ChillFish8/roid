@@ -141,9 +141,18 @@ class Command(OptionalAsyncCallable):
         # We dont want to be producing options for these special cases
         # so we also remove them from the annotations.
         self._pass_target: Tuple[PassTarget, str] = (PassTarget.NONE, "_")
+        self._pass_app = False
         for param, type_ in self.annotations.copy().items():
             if name == "return":
                 continue
+
+            try:
+                if type_.__name__ == SlashCommands:
+                    self._pass_app = True
+                    del self.annotations[param]
+                    continue
+            except AttributeError:
+                pass
 
             if type_ is PartialMessage:
                 del self.annotations[param]

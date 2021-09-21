@@ -132,7 +132,7 @@ class DeferredCommand(DeferredAppItem):
         guild_ids: Optional[List[int]] = None,
         type: Optional[CommandType] = None,
         default_permissions: bool = False,
-        defer_register: bool = True,
+        defer_register: bool = False,
     ):
         """
         A command like structure that creates a build pipeline
