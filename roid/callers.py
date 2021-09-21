@@ -34,6 +34,9 @@ class OptionalAsyncCallable:
 
         self._pass_interaction_to: Optional[str] = None
         for param, hint in self.annotations.copy().items():
+            if param == "return":
+                continue
+
             try:
                 name = hint.__name__
             except AttributeError:

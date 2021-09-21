@@ -146,7 +146,7 @@ class ChannelType(IntEnum):
     GUILD_NEWS_THREAD = 10
     GUILD_PUBLIC_THREAD = 11
     GUILD_PRIVATE_THREAD = 12
-    GUILD_STAGE_VOICe = 13
+    GUILD_STAGE_VOICE = 13
 
 
 class OverwriteType(IntEnum):

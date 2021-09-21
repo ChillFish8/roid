@@ -142,6 +142,9 @@ class Command(OptionalAsyncCallable):
         # so we also remove them from the annotations.
         self._pass_target: Tuple[PassTarget, str] = (PassTarget.NONE, "_")
         for param, type_ in self.annotations.copy().items():
+            if name == "return":
+                continue
+
             if type_ is PartialMessage:
                 del self.annotations[param]
                 self._pass_target = (PassTarget.MESSAGE, param)
@@ -191,6 +194,9 @@ class Command(OptionalAsyncCallable):
     ) -> List[Tuple[CommandOption, Any]]:
         options = []
         for name, type_ in self.annotations.items():
+            if name == "return":
+                continue
+
             choice_blocks = []
 
             # See if we have a selection options.

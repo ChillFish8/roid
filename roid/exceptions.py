@@ -40,7 +40,7 @@ class AbortInvoke(RoidException):
             tts=tts,
             components=components,
             component_context=component_context,
-            response_type=response_type,
+            type=response_type,
         )
 
 
