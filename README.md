@@ -19,7 +19,7 @@ You can get started with the following options, most of the public API is type h
 and a lot of the framework depends around this so you should be able to stand on your
 own two feet reasonable quickly.
 
-- **[Examples](https://github.com/ChillFish8/roid/tree/master/roid)** are the best / only place to start.
+- **[Examples](https://github.com/ChillFish8/roid/tree/master/examples)** are the best / only place to start.
 
 ## ✨ Basic Example
 ```py
