@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from typing import List, Optional, Dict, Any, Union, TYPE_CHECKING
 
-from pydantic import BaseModel, constr, validate_arguments
+from pydantic import BaseModel, constr, validate_arguments, validator
 
 from roid.state import COMMAND_STATE_TARGET
 
@@ -13,7 +13,13 @@ if TYPE_CHECKING:
 
 from roid.deferred import DeferredComponent
 from roid.components import Component, ActionRow, ComponentType, ComponentContext
-from roid.objects import Embed, AllowedMentions, ResponseType, ResponseFlags
+from roid.objects import (
+    Embed,
+    AllowedMentions,
+    ResponseType,
+    ResponseFlags,
+    CompletedOption,
+)
 
 
 class ResponseData(BaseModel):
@@ -24,8 +30,20 @@ class ResponseData(BaseModel):
     flags: Optional[int]
     components: Optional[List[ActionRow]]
 
+    choices: Optional[List[CompletedOption]]
+
     # Purely internal
     component_context: Optional[dict]
+
+    @validator("choices")
+    def check_choices(cls, v):
+        if v is None:
+            return v
+
+        if len(v) > 20:
+            raise ValueError(f"returned choices cannot be greater than 20 items.")
+
+        return v
 
     def dict(
         self,
@@ -38,7 +56,7 @@ class ResponseData(BaseModel):
         else:
             exclude.add("component_context")
 
-        return super().dict(exclude=exclude, **kwargs)
+        return super().dict(exclude=exclude, exclude_none=True, **kwargs)
 
 
 class DeferredResponsePayload(ResponseData):

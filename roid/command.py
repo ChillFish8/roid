@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import typing
 
 from enum import Enum, IntEnum, auto
@@ -16,6 +17,8 @@ from typing import (
     TYPE_CHECKING,
 )
 from pydantic import BaseModel, constr, validate_arguments
+from fastapi import HTTPException
+
 
 if TYPE_CHECKING:
     from roid.app import SlashCommands
@@ -28,11 +31,20 @@ from roid.interactions import (
     CommandOption,
     CommandOptionType,
     CommandChoice,
+    InteractionType,
 )
-from roid.objects import Role, Channel, Member, PartialMessage, User
+from roid.objects import (
+    Role,
+    Channel,
+    Member,
+    PartialMessage,
+    User,
+    ResponseType,
+    CompletedOption,
+)
 from roid.extractors import extract_options
 from roid.checks import CommandCheck
-from roid.response import ResponsePayload
+from roid.response import ResponsePayload, ResponseData
 from roid.callers import OptionalAsyncCallable
 
 
@@ -63,11 +75,13 @@ class SetValue:
         default: Union[str, int, float, None, bool],
         name: Optional[str],
         description: Optional[str],
+        autocomplete: bool,
     ):
         self.default = default
         self.required = self.default is Ellipsis
         self.name = name
         self.description = description
+        self.autocomplete = autocomplete
 
 
 def Option(
@@ -75,8 +89,9 @@ def Option(
     *,
     name: str = None,
     description: str = None,
+    autocomplete: bool = False,
 ) -> Any:  # noqa
-    return SetValue(default, name, description)
+    return SetValue(default, name, description, autocomplete)
 
 
 VALID_CHOICE_TYPES = (
@@ -109,6 +124,47 @@ class PassTarget(IntEnum):
     MESSAGE = auto()
     USER = auto()
     MEMBER = auto()
+
+
+class AutoCompleteHandler(OptionalAsyncCallable):
+    """
+    A autocomplete option that gets invoked when ever a user starts typing
+    the auto complete field.
+    """
+
+    DEFAULT_TARGET = "_AUTO_COMPLETE_DEFAULT"
+    Callback = Callable[
+        ..., Union[List[CompletedOption], Coroutine[Any, Any, CompletedOption]]
+    ]
+
+    def __init__(
+        self,
+        callback: Callback,
+        target: Optional[str] = None,
+    ):
+        super().__init__(callback)
+
+        self.target = target
+
+    async def _get_kwargs(
+        self,
+        app: SlashCommands,
+        interaction: Interaction,
+    ) -> dict:
+        kwargs = await super()._get_kwargs(app, interaction)
+
+        if interaction.data.options is None:
+            raise HTTPException(status_code=400)
+
+        for option in interaction.data.options:
+            if self.target is not None and self.target == option.name:
+                kwargs[option.name] = option
+                break
+
+            if self.target is None:
+                kwargs[option.name] = option
+
+        return kwargs
 
 
 class Command(OptionalAsyncCallable):
@@ -186,6 +242,7 @@ class Command(OptionalAsyncCallable):
         self.default_permission = default_permissions
         self.options = options if len(options) != 0 else None
 
+        self._autocomplete_handlers: Dict[str, AutoCompleteHandler] = {}
         self._checks_pipeline: List[CommandCheck] = []
 
     def _get_details_from_spec(
@@ -303,6 +360,12 @@ class Command(OptionalAsyncCallable):
         This is naive of any guild ids registered for this command.
         """
 
+        options = self.options
+
+        for option in options:
+            if option.name in self._autocomplete_handlers:
+                option.autocomplete = True
+
         return CommandContext(
             application_id=self.application_id,
             type=self.type,
@@ -383,8 +446,13 @@ class Command(OptionalAsyncCallable):
         return {**kwargs, **extend}
 
     async def __call__(
-        self, app: SlashCommands, interaction: Interaction
+        self,
+        app: SlashCommands,
+        interaction: Interaction,
     ) -> ResponsePayload:
+        if interaction.type == InteractionType.APPLICATION_COMMAND_AUTOCOMPLETE:
+            return await self._handle_autocomplete(app, interaction)
+
         try:
             for check in self._checks_pipeline:
                 interaction = await check(app, interaction)
@@ -392,6 +460,45 @@ class Command(OptionalAsyncCallable):
             return await self._invoke_error_handler(app, interaction, e)
 
         return await self._invoke(app, interaction)
+
+    async def _handle_autocomplete(
+        self,
+        app: SlashCommands,
+        interaction: Interaction,
+    ) -> ResponsePayload:
+        primary_caller = self._autocomplete_handlers.get(
+            AutoCompleteHandler.DEFAULT_TARGET
+        )
+        if primary_caller is not None:
+            results = await primary_caller(app, interaction)
+            return ResponsePayload(
+                type=ResponseType.APPLICATION_COMMAND_AUTOCOMPLETE_RESULT,
+                data=ResponseData(choices=results),
+            )
+
+        if interaction.data.options is None:
+            raise HTTPException(status_code=400)
+
+        target: Optional[str] = None
+        for option in interaction.data.options:
+            if option.focused:
+                target = option.name
+                break
+
+        if target is None:
+            raise HTTPException(status_code=400)
+
+        secondary_caller = self._autocomplete_handlers.get(target)
+        if secondary_caller is None:
+            raise ValueError(
+                f"no autocomplete handler exists option {secondary_caller!r}."
+            )
+
+        results = await secondary_caller(app, interaction)
+        return ResponsePayload(
+            type=ResponseType.APPLICATION_COMMAND_AUTOCOMPLETE_RESULT,
+            data=ResponseData(choices=results),
+        )
 
     def error(
         self,
@@ -411,6 +518,60 @@ class Command(OptionalAsyncCallable):
         """
         self._register_error_handler(func)
         return func
+
+    def autocomplete(
+        self,
+        func: Optional[AutoCompleteHandler.Callback] = None,
+        *,
+        for_=AutoCompleteHandler.DEFAULT_TARGET,
+    ):
+        """
+        Add a callback for auto complete interaction
+        requests for all or a specific option.
+
+        This decorator can be used either as a generic @command.autocomplete
+        or pass a option target via @command.autocomplete(for_="my_option_name").
+
+        Args:
+            func:
+                The callback for the autocomplete interaction.
+                This is only required when adding a general handler for all options.
+            for_:
+                A optional name to target a specific option.
+                If this is given the callback will only be invoked if the value is
+                focused.
+                The callback required will also just be given the raw `value: str`
+                keyword opposed to a set of kwargs.
+        """
+        if func is not None:
+            existing = self._autocomplete_handlers.get(
+                AutoCompleteHandler.DEFAULT_TARGET
+            )
+            if not existing:
+                raise ValueError(
+                    f"general autocomplete handler registered already as callable: {existing!r}."
+                )
+
+            if existing and len(self._autocomplete_handlers) > 1:
+                raise ValueError(
+                    f"a general autocomplete handler cannot be registered when using targeted autocomplete handlers as well."
+                )
+
+            self._autocomplete_handlers[for_] = AutoCompleteHandler(func, target=None)
+            return func
+
+        if for_ not in self.original_annotations:
+            if for_ != AutoCompleteHandler.DEFAULT_TARGET:
+                raise ValueError(
+                    f"there is no parameter named {for_!r} in the command's signature."
+                )
+            raise TypeError(f"missing required keyword parameter 'for_'.")
+
+        def wrapper(func_):
+            self._autocomplete_handlers[for_] = AutoCompleteHandler(func_, target=for_)
+            return func_
+
+        return wrapper
 
 
 class GroupCommand(Command):

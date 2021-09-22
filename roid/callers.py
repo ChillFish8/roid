@@ -47,6 +47,7 @@ class OptionalAsyncCallable:
                     break
 
         self.spec = inspect.getfullargspec(callback)
+        self.original_annotations = self.spec.annotations.copy()
 
         self._pass_interaction_to: Optional[str] = None
         self._pass_app: bool = False

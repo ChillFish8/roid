@@ -36,6 +36,7 @@ class CommandOption(BaseModel):
     name: str
     description: str
     required: bool = False
+    autocomplete: bool = False
     choices: List[CommandChoice] = None
     options: List["CommandOption"] = None
 
@@ -47,6 +48,7 @@ class InteractionType(IntEnum):
     PING = auto()
     APPLICATION_COMMAND = auto()
     MESSAGE_COMPONENT = auto()
+    APPLICATION_COMMAND_AUTOCOMPLETE = auto()
 
 
 class ResolvedData(BaseModel):
@@ -69,6 +71,7 @@ class OptionData(BaseModel):
         ]
     ]
     options: Optional["OptionData"]
+    focused: bool = False
 
 
 OptionData.update_forward_refs()

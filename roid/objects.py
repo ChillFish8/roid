@@ -61,6 +61,11 @@ class User(BaseModel):
         return f"{DISCORD_CDN_DOMAIN}/avatars/{self.id}/{self.avatar}.{fmt}"
 
 
+class CompletedOption(BaseModel):
+    name: str
+    value: str
+
+
 class RoleTags(BaseModel):
     bot_id: int = None
     integration_id: int = None
@@ -468,6 +473,7 @@ class ResponseType(IntEnum):
     DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE = 5
     DEFERRED_UPDATE_MESSAGE = 6
     UPDATE_MESSAGE = 7
+    APPLICATION_COMMAND_AUTOCOMPLETE_RESULT = 8
 
 
 class ResponseFlags(IntEnum):
