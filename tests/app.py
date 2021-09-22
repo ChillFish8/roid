@@ -7,6 +7,7 @@ import uvicorn
 from roid import (
     SlashCommands,
     Response,
+    CommandsBlueprint,
 )
 from roid.interactions import CommandChoice
 from roid.objects import CompletedOption
@@ -21,8 +22,9 @@ app = SlashCommands(
     register_commands=True,
 )
 
+bp = CommandsBlueprint()
 
-@app.command(
+@bp.command(
     "search",
     description=(
         "Add Crunchy's release webhook to a channel of "
@@ -44,6 +46,7 @@ async def run_query(query: CommandChoice = None):
     return [CompletedOption(name=query.value, value=query.value)]
 
 
+app.add_blueprint(bp)
 if __name__ == "__main__":
     app.register_commands_on_start()
     uvicorn.run("app:app", port=8000)
