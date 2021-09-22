@@ -41,11 +41,9 @@ async def all_results(
     # or you can do **options to get all autocomplete specified values.
     search_query: CommandOption = None,
 ) -> List[CompletedOption]:
-    print(search_query)
-    return []
+    return [CompletedOption(name="Cheese", value="Cheese!")]
 
 
 if __name__ == "__main__":
-    print(add_news_channel.ctx)
     app.register_commands_on_start()
     uvicorn.run("app:app", port=8000)

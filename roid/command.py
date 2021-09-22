@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import inspect
-import pprint
 import typing
 
 from enum import Enum, IntEnum, auto
@@ -481,7 +479,6 @@ class Command(OptionalAsyncCallable):
         app: SlashCommands,
         interaction: Interaction,
     ) -> ResponsePayload:
-        pprint.pprint(interaction.dict())
 
         primary_caller = self._autocomplete_handlers.get(
             AutoCompleteHandler.DEFAULT_TARGET
