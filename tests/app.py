@@ -48,4 +48,4 @@ async def ahh_results():
 
 if __name__ == "__main__":
     app.register_commands_on_start()
-    uvicorn.run("app:sc", port=8000)
+    uvicorn.run("app:app", port=8000)

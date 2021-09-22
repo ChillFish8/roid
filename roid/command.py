@@ -547,12 +547,12 @@ class Command(OptionalAsyncCallable):
             existing = self._autocomplete_handlers.get(
                 AutoCompleteHandler.DEFAULT_TARGET
             )
-            if not existing:
+            if existing:
                 raise ValueError(
-                    f"general autocomplete handler registered already as callable: {existing!r}."
+                    f"general autocomplete handler registered already as callable: {existing._callback!r}."
                 )
 
-            if existing and len(self._autocomplete_handlers) > 1:
+            if not existing and len(self._autocomplete_handlers) > 1:
                 raise ValueError(
                     f"a general autocomplete handler cannot be registered when using targeted autocomplete handlers as well."
                 )
@@ -566,6 +566,12 @@ class Command(OptionalAsyncCallable):
                     f"there is no parameter named {for_!r} in the command's signature."
                 )
             raise TypeError(f"missing required keyword parameter 'for_'.")
+
+        existing = self._autocomplete_handlers.get(AutoCompleteHandler.DEFAULT_TARGET)
+        if existing:
+            raise ValueError(
+                f"general autocomplete handler registered already as callable: {existing._callback!r}."
+            )
 
         def wrapper(func_):
             self._autocomplete_handlers[for_] = AutoCompleteHandler(func_, target=for_)
