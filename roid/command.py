@@ -74,7 +74,7 @@ class SetValue:
         default: Union[str, int, float, None, bool],
         name: Optional[str],
         description: Optional[str],
-        autocomplete: bool,
+        autocomplete: Optional[bool],
     ):
         self.default = default
         self.required = self.default is Ellipsis
@@ -88,7 +88,7 @@ def Option(
     *,
     name: str = None,
     description: str = None,
-    autocomplete: bool = False,
+    autocomplete: Optional[bool] = None,
 ) -> Any:  # noqa
     return SetValue(default, name, description, autocomplete)
 

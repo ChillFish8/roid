@@ -47,18 +47,18 @@ class User(BaseModel):
     def avatar_url(self) -> str:
         fmt = "png"
         if self.avatar is None:
-            return f"{DISCORD_CDN_DOMAIN}/embed/avatars/{self.discriminator % 5}.png"
+            return f"https://{DISCORD_CDN_DOMAIN}/embed/avatars/{self.discriminator % 5}.png"
 
         if self.avatar.startswith("a_"):
             fmt = "gif"
 
-        return f"{DISCORD_CDN_DOMAIN}/avatars/{self.id}/{self.avatar}.{fmt}"
+        return f"https://{DISCORD_CDN_DOMAIN}/avatars/{self.id}/{self.avatar}.{fmt}"
 
     def avatar_url_as(self, *, fmt="png"):
         if self.avatar is None:
-            return f"{DISCORD_CDN_DOMAIN}/embed/avatars/{self.discriminator % 5}.{fmt}"
+            return f"https://{DISCORD_CDN_DOMAIN}/embed/avatars/{self.discriminator % 5}.{fmt}"
 
-        return f"{DISCORD_CDN_DOMAIN}/avatars/{self.id}/{self.avatar}.{fmt}"
+        return f"https://{DISCORD_CDN_DOMAIN}/avatars/{self.id}/{self.avatar}.{fmt}"
 
 
 class CompletedOption(BaseModel):
