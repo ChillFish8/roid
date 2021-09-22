@@ -33,8 +33,7 @@ bp = CommandsBlueprint()
     defer_register=False,
     guild_id=675647130647658527,
 )
-async def search(query: str, other_option: str = Option(autocomplete=False)) -> Response:
-    print(search.ctx)
+async def search(query: str = Option(description="Search for the Anime here.", autocomplete=True), other_option: str = Option(autocomplete=False)) -> Response:
     print(query, other_option)
     return Response(
         content=(f"<:exitment:717784139641651211> All done! I'll send news to "),
@@ -42,8 +41,7 @@ async def search(query: str, other_option: str = Option(autocomplete=False)) -> 
 
 
 @search.autocomplete(for_="query")
-async def run_query(query: CommandChoice = None):
-    print(query)
+async def run_query(query: CommandChoice = None, other_option: CommandChoice = None):
     return [CompletedOption(name=query.value, value=query.value)]
 
 
