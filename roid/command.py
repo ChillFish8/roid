@@ -364,26 +364,26 @@ class Command(OptionalAsyncCallable):
         """
 
         options = self.options
+        if options is not None:
+            for option in options:
+                if (
+                    (option.name in self._autocomplete_handlers)
+                    and (option.autocomplete is None)
+                    and (option.type == CommandOptionType.STRING)
+                ):
+                    option.autocomplete = True
+                    continue
 
-        for option in options:
-            if (
-                (option.name in self._autocomplete_handlers)
-                and (option.autocomplete is None)
-                and (option.type == CommandOptionType.STRING)
-            ):
-                option.autocomplete = True
-                continue
-
-            general_handler = self._autocomplete_handlers.get(
-                AutoCompleteHandler.DEFAULT_TARGET
-            )
-            if (
-                (general_handler is not None)
-                and (option.name in general_handler.target_options)
-                and (option.autocomplete is None)
-                and (option.type == CommandOptionType.STRING)
-            ):
-                option.autocomplete = True
+                general_handler = self._autocomplete_handlers.get(
+                    AutoCompleteHandler.DEFAULT_TARGET
+                )
+                if (
+                    (general_handler is not None)
+                    and (option.name in general_handler.target_options)
+                    and (option.autocomplete is None)
+                    and (option.type == CommandOptionType.STRING)
+                ):
+                    option.autocomplete = True
 
         return CommandContext(
             application_id=self.application_id,
