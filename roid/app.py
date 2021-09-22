@@ -123,7 +123,7 @@ class SlashCommands(FastAPI):
 
         self._commands: Dict[str, Union[Command, CommandGroup]] = {}
         self._components: Dict[str, Component] = {}
-        self._http = HttpHandler(application_id, token)
+        self._http: Optional[HttpHandler] = None
 
         # register the internal route and FastAPI internals.
         self.post("/", name="Interaction Events")(self.__root)
@@ -149,6 +149,8 @@ class SlashCommands(FastAPI):
 
     async def _startup(self):
         """A startup lifetime task invoked by the ASGI server."""
+
+        self._http = HttpHandler(self.application_id, self._token)
 
         self.__state = MultiManagedState(backend=self.__state_backend)
         await self.__state.startup()
