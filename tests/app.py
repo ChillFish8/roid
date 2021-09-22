@@ -8,10 +8,10 @@ from roid import (
     SlashCommands,
     Response,
     CommandsBlueprint,
+    Option
 )
 from roid.interactions import CommandChoice
 from roid.objects import CompletedOption
-from roid.command import CommandOption
 
 logging.basicConfig(level=logging.INFO)
 
@@ -33,8 +33,9 @@ bp = CommandsBlueprint()
     defer_register=False,
     guild_id=675647130647658527,
 )
-async def search(query: str) -> Response:
-    print(query)
+async def search(query: str, other_option: str = Option(autocomplete=False)) -> Response:
+    print(search.ctx)
+    print(query, other_option)
     return Response(
         content=(f"<:exitment:717784139641651211> All done! I'll send news to "),
     )

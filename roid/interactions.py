@@ -36,7 +36,7 @@ class CommandOption(BaseModel):
     name: str
     description: str
     required: bool = False
-    autocomplete: bool = False
+    autocomplete: Optional[bool] = None
     choices: List[CommandChoice] = None
     options: List["CommandOption"] = None
 

@@ -366,7 +366,11 @@ class Command(OptionalAsyncCallable):
         options = self.options
 
         for option in options:
-            if option.name in self._autocomplete_handlers:
+            if (
+                (option.name in self._autocomplete_handlers)
+                and (option.autocomplete is None)
+                and (option.type == CommandOptionType.STRING)
+            ):
                 option.autocomplete = True
                 continue
 
@@ -374,8 +378,10 @@ class Command(OptionalAsyncCallable):
                 AutoCompleteHandler.DEFAULT_TARGET
             )
             if (
-                general_handler is not None
-                and option.name in general_handler.target_options
+                (general_handler is not None)
+                and (option.name in general_handler.target_options)
+                and (option.autocomplete is None)
+                and (option.type == CommandOptionType.STRING)
             ):
                 option.autocomplete = True
 
@@ -557,6 +563,7 @@ class Command(OptionalAsyncCallable):
                 The callback required will also just be given the raw `value: str`
                 keyword opposed to a set of kwargs.
         """
+
         if func is not None:
             existing = self._autocomplete_handlers.get(for_)
             if existing:

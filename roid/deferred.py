@@ -292,7 +292,7 @@ class DeferredCommand(DeferredAppItem):
             return func
 
         def wrapper(func_):
-            self._call_pipeline.append(CallDeferredAttr("autocomplete", func, for_=for_))
+            self._call_pipeline.append(CallDeferredAttr("autocomplete", func_, for_=for_))
             return func_
 
         return wrapper
