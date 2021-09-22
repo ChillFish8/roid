@@ -8,6 +8,8 @@ from roid import (
     SlashCommands,
     Response,
 )
+from roid.objects import CompletedOption
+from roid.command import CommandOption
 
 logging.basicConfig(level=logging.INFO)
 
@@ -34,18 +36,16 @@ async def add_news_channel(search_query: str, ahh: str) -> Response:
     )
 
 
-# Handle all autofill options
 @add_news_channel.autocomplete
-async def all_results(search_query: str = None, ahh: str = None) -> List[str]:
-    ...
-
-
-# Handle all autofill options
-@add_news_channel.autocomplete(for_="ahh")
-async def ahh_results():
-    ...
+async def all_results(
+    # or you can do **options to get all autocomplete specified values.
+    search_query: CommandOption = None,
+) -> List[CompletedOption]:
+    print(search_query)
+    return []
 
 
 if __name__ == "__main__":
+    print(add_news_channel.ctx)
     app.register_commands_on_start()
     uvicorn.run("app:app", port=8000)

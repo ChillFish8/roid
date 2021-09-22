@@ -237,7 +237,10 @@ class SlashCommands(FastAPI):
 
         if interaction.type == InteractionType.PING:
             return {"type": ResponseType.PONG}
-        elif interaction.type == InteractionType.APPLICATION_COMMAND:
+        elif interaction.type in (
+            InteractionType.APPLICATION_COMMAND,
+            InteractionType.APPLICATION_COMMAND_AUTOCOMPLETE,
+        ):
             cmd = self._commands.get(interaction.data.name)
             if cmd is None:
                 raise HTTPException(status_code=400, detail="No command found")

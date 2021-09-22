@@ -56,7 +56,7 @@ class ResponseData(BaseModel):
         else:
             exclude.add("component_context")
 
-        return super().dict(exclude=exclude, exclude_none=True, **kwargs)
+        return super().dict(exclude=exclude, **kwargs)
 
 
 class DeferredResponsePayload(ResponseData):

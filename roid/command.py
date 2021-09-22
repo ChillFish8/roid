@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import pprint
 import typing
 
 from enum import Enum, IntEnum, auto
@@ -146,6 +147,8 @@ class AutoCompleteHandler(OptionalAsyncCallable):
 
         self.target = target
 
+        self.target_options = {name for name in self.annotations if name != "return"}
+
     async def _get_kwargs(
         self,
         app: SlashCommands,
@@ -161,7 +164,9 @@ class AutoCompleteHandler(OptionalAsyncCallable):
                 kwargs[option.name] = option
                 break
 
-            if self.target is None:
+            if self.target is None and len(self.annotations) <= 1:
+                kwargs[option.name] = option
+            elif self.target is None and option.name in self.annotations:
                 kwargs[option.name] = option
 
         return kwargs
@@ -365,6 +370,16 @@ class Command(OptionalAsyncCallable):
         for option in options:
             if option.name in self._autocomplete_handlers:
                 option.autocomplete = True
+                continue
+
+            general_handler = self._autocomplete_handlers.get(
+                AutoCompleteHandler.DEFAULT_TARGET
+            )
+            if (
+                general_handler is not None
+                and option.name in general_handler.target_options
+            ):
+                option.autocomplete = True
 
         return CommandContext(
             application_id=self.application_id,
@@ -466,6 +481,8 @@ class Command(OptionalAsyncCallable):
         app: SlashCommands,
         interaction: Interaction,
     ) -> ResponsePayload:
+        pprint.pprint(interaction.dict())
+
         primary_caller = self._autocomplete_handlers.get(
             AutoCompleteHandler.DEFAULT_TARGET
         )
