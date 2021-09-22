@@ -3,13 +3,11 @@ from __future__ import annotations
 from typing import List, Union, TYPE_CHECKING, Optional, Callable, Coroutine, Any, Dict
 from pydantic import constr, conint
 
-from roid.exceptions import CommandAlreadyExists
-
 if TYPE_CHECKING:
     from roid import CommandType
     from roid.app import SlashCommands
     from roid.components import Component, ButtonStyle
-    from roid.command import Command, CommandContext, CommandGroup
+    from roid.command import Command, CommandContext, CommandGroup, AutoCompleteHandler
     from roid.checks import CommandCheck
     from roid.response import ResponsePayload
     from roid.interactions import Interaction
@@ -261,6 +259,43 @@ class DeferredCommand(DeferredAppItem):
         self._call_pipeline.append(CallDeferredAttr("error", func))
 
         return func
+
+    def autocomplete(
+        self,
+        func: Optional[AutoCompleteHandler.Callback] = None,
+        *,
+        for_="_AUTO_COMPLETE_DEFAULT",
+    ):
+        """
+        Add a callback for auto complete interaction
+        requests for all or a specific option.
+
+        This decorator can be used either as a generic @command.autocomplete
+        or pass a option target via @command.autocomplete(for_="my_option_name").
+
+        Args:
+            func:
+                The callback for the autocomplete interaction.
+                This is only required when adding a general handler for all options.
+            for_:
+                A optional name to target a specific option.
+                If this is given the callback will only be invoked if the value is
+                focused.
+                The callback required will also just be given the raw `value: str`
+                keyword opposed to a set of kwargs.
+        """
+        if self._initialised is not None:
+            return self._initialised.autocomplete(func, for_=for_)
+
+        if func is not None:
+            self._call_pipeline.append(CallDeferredAttr("autocomplete", func))
+            return func
+
+        def wrapper(func_):
+            self._call_pipeline.append(CallDeferredAttr("autocomplete", func, for_=for_))
+            return func_
+
+        return wrapper
 
     def __call__(self, *args, **kwargs):
         if self._initialised is not None:

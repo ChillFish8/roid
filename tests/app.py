@@ -8,6 +8,7 @@ from roid import (
     SlashCommands,
     Response,
 )
+from roid.interactions import CommandChoice
 from roid.objects import CompletedOption
 from roid.command import CommandOption
 
@@ -22,7 +23,7 @@ app = SlashCommands(
 
 
 @app.command(
-    "add-release-channel",
+    "search",
     description=(
         "Add Crunchy's release webhook to a channel of "
         "your choice to get the latest Anime release details."
@@ -30,18 +31,17 @@ app = SlashCommands(
     defer_register=False,
     guild_id=675647130647658527,
 )
-async def add_news_channel(search_query: str, ahh: str) -> Response:
+async def search(query: str) -> Response:
+    print(query)
     return Response(
         content=(f"<:exitment:717784139641651211> All done! I'll send news to "),
     )
 
 
-@add_news_channel.autocomplete
-async def all_results(
-    # or you can do **options to get all autocomplete specified values.
-    search_query: CommandOption = None,
-) -> List[CompletedOption]:
-    return [CompletedOption(name="Cheese", value="Cheese!")]
+@search.autocomplete(for_="query")
+async def run_query(query: CommandChoice = None):
+    print(query)
+    return [CompletedOption(name=query.value, value=query.value)]
 
 
 if __name__ == "__main__":

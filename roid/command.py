@@ -558,20 +558,14 @@ class Command(OptionalAsyncCallable):
                 keyword opposed to a set of kwargs.
         """
         if func is not None:
-            existing = self._autocomplete_handlers.get(
-                AutoCompleteHandler.DEFAULT_TARGET
-            )
+            existing = self._autocomplete_handlers.get(for_)
             if existing:
                 raise ValueError(
-                    f"general autocomplete handler registered already as callable: {existing._callback!r}."
+                    f"autocomplete handler {for_!r} registered already as callable: {existing._callback!r}."
                 )
 
-            if not existing and len(self._autocomplete_handlers) > 1:
-                raise ValueError(
-                    f"a general autocomplete handler cannot be registered when using targeted autocomplete handlers as well."
-                )
-
-            self._autocomplete_handlers[for_] = AutoCompleteHandler(func, target=None)
+            target = for_ if for_ != AutoCompleteHandler.DEFAULT_TARGET else None
+            self._autocomplete_handlers[for_] = AutoCompleteHandler(func, target=target)
             return func
 
         if for_ not in self.original_annotations:
