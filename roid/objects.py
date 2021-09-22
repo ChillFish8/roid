@@ -291,6 +291,10 @@ class Embed(BaseModel):
         self.image = EmbedImage(url=url)
 
     @validate_arguments
+    def set_thumbnail(self, *, url: str):
+        self.thumbnail = EmbedImage(url=url)
+
+    @validate_arguments
     def set_footer(
         self,
         text: constr(min_length=1, max_length=2048, strip_whitespace=True),
@@ -319,6 +323,9 @@ class Embed(BaseModel):
         value: constr(min_length=1, max_length=1024, strip_whitespace=True),
         inline: bool = False,
     ):
+        if self.fields is None:
+            self.fields = []
+
         self.fields.append(EmbedField(name=name, value=value, inline=inline))
 
 
