@@ -40,7 +40,7 @@ bp = CommandsBlueprint()
 )
 async def search() -> Response:
     return Response(
-        content=(f"<:exitment:717784139641651211> All done! I'll send news to "),
+        content=f"<:exitment:717784139641651211> All done! I'll send news to ",
         components=[[test_button]],
         component_context={"test": "ahh", "ttl": 30},
     )
@@ -49,7 +49,7 @@ async def search() -> Response:
 @bp.button(label="test", style=ButtonStyle.PRIMARY)
 async def test_button(ctx: InvokeContext):
     return Response(
-        content=(f"<:exitment:717784139641651211> All done! I'll send news to "),
+        content=f"<:exitment:717784139641651211> All done! I'll send news to ",
         components=[[test_button.disabled()]],
         component_context={"ttl": 30},
     )

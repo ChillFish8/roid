@@ -301,7 +301,7 @@ class Component(OptionalAsyncCallable):
         if self._oneshot:
             await state.remove(reference_id)
 
-        if self._ctx.options is not None and interaction.data.values is not None:
+        if interaction.data.values is not None:
             kwargs[self._target_options_parameter] = interaction.data.values
 
         if ctx is not None:
