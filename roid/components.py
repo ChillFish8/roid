@@ -337,8 +337,15 @@ class Component(OptionalAsyncCallable):
         if self._oneshot:
             await state.remove(reference_id)
 
-        if interaction.data.values is not None:
-            kwargs[self._target_options_parameter] = interaction.data.values
+        if interaction.data.values is not None and len(interaction.data.values) > 0:
+            min_ = self.data.min_values
+            max_ = self.data.max_values
+            if min_ is None and max_ is None:
+                kwargs[self._target_options_parameter] = interaction.data.values[0]
+            elif min_ == 1 and max_ == 1:
+                kwargs[self._target_options_parameter] = interaction.data.values[0]
+            else:
+                kwargs[self._target_options_parameter] = interaction.data.values
 
         if ctx is not None:
             ctx["reference_id"] = reference_id

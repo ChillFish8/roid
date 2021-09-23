@@ -6,7 +6,7 @@ from pydantic import constr, conint
 if TYPE_CHECKING:
     from roid import CommandType
     from roid.app import SlashCommands
-    from roid.components import Component, ButtonStyle
+    from roid.components import Component, ButtonStyle, SelectOption, ComponentContext
     from roid.command import Command, CommandContext, CommandGroup, AutoCompleteHandler
     from roid.checks import CommandCheck
     from roid.response import ResponsePayload
@@ -148,6 +148,28 @@ class DeferredSelect(DeferredComponent):
 
     def __call__(self, app: SlashCommands) -> Component:
         return super().__call__(app)
+
+    def with_options(self, items: List[SelectOption]) -> ComponentContext:
+        """
+        Takes a general select component and populates it with the given options.
+
+        NOTE: This is only valid if the component is a select type.
+
+        WARNING: If this is not done the general select will be rejected.
+
+        Args:
+            items:
+                A list of select options for the user to choose from.
+
+        Returns:
+            The populated context of the component.
+        """
+
+        if self._initialised is None:
+            raise TypeError(f"component not initialised")
+
+        ctx = self._initialised.data.copy()
+        return ctx.with_options(items)
 
 
 class DeferredCommand(DeferredAppItem):

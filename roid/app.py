@@ -678,8 +678,13 @@ class SlashCommands(FastAPI):
                         f"multi-value selects must be typed as a List[T] rather than T."
                     )
 
-                inner, *_ = typing.get_args(origin)
-                if (origin is list) and (inner is SelectOption):
+                if origin is list:
+                    inner, *_ = typing.get_args(origin)
+                    if inner is SelectOption:
+                        options = []
+                        break
+
+                if origin is SelectOption:
                     options = []
                     break
 

@@ -54,6 +54,8 @@ async def test_button(ctx: InvokeContext):
         component_context={"ttl": 30},
     )
 
+@bp.select(placeholder="Pick a value, any value!")
+async def test_select(options: List[])
 
 app.add_blueprint(bp)
 if __name__ == "__main__":
