@@ -77,6 +77,14 @@ class ComponentContext(BaseModel):
     min_values: Optional[conint(ge=0, le=25)]
     max_values: Optional[conint(ge=0, le=25)]
 
+    def disabled(self) -> "ComponentContext":
+        self.disabled = True
+        return self
+
+    def with_options(self, items: List[SelectOption]):
+        self.options = items
+        return self
+
 
 class ActionRow(BaseModel):
     type: ComponentType = ComponentType.ACTION_ROW
@@ -182,8 +190,6 @@ class Component(OptionalAsyncCallable):
 
                 If this is a link button is never called so it would be a good idea
                 to use the helper function.
-
-
         """
 
         super().__init__(callback, None, validate=True)
@@ -222,16 +228,46 @@ class Component(OptionalAsyncCallable):
         self._pass_context_to = pass_context_to
 
     def disabled(self) -> ComponentContext:
-        """Returns a disabled version of this button."""
+        """
+        Returns a disabled version of this component.
+        """
         ctx = self.data.copy()
         ctx.disabled = True
         return ctx
 
+    def with_options(self, items: List[SelectOption]) -> ComponentContext:
+        """
+        Takes a general select component and populates it with the given options.
+
+        NOTE: This is only valid if the component is a select type.
+
+        WARNING: If this is not done the general select will be rejected.
+
+        Args:
+            items:
+                A list of select options for the user to choose from.
+
+        Returns:
+            The populated context of the component.
+        """
+        ctx = self.data.copy()
+        return ctx.with_options(items)
+
     @property
     def data(self) -> ComponentContext:
+        """
+        Gets the possibly unpopulated context of the component.
+
+        This is what's actually sent to Discord.
+        """
         return self._ctx
 
     def error(self, func: SyncOrAsyncCallable):
+        """
+        Map an error handler to the component.
+
+        If a handler already exists the new handler will override it.
+        """
         self._register_error_handler(func)
 
     def __hash__(self):
