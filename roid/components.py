@@ -221,6 +221,12 @@ class Component(OptionalAsyncCallable):
         self._oneshot = oneshot
         self._pass_context_to = pass_context_to
 
+    def disabled(self) -> ComponentContext:
+        """Returns a disabled version of this button."""
+        ctx = self.data.copy()
+        ctx.disabled = True
+        return ctx
+
     @property
     def data(self) -> ComponentContext:
         return self._ctx

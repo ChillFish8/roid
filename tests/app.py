@@ -8,10 +8,13 @@ from roid import (
     SlashCommands,
     Response,
     CommandsBlueprint,
-    Option
+    Option,
+    ButtonStyle,
+    InvokeContext,
 )
 from roid.interactions import CommandChoice
 from roid.objects import CompletedOption
+from roid.state import RedisBackend
 
 logging.basicConfig(level=logging.INFO)
 
@@ -20,9 +23,11 @@ app = SlashCommands(
     "afca14022e5fa694a843b07699e9dd2c3fb0702ccc55cbb38c343c56aa8857bc",
     os.getenv("TOKEN"),
     register_commands=True,
+    state_backend=RedisBackend(),
 )
 
 bp = CommandsBlueprint()
+
 
 @bp.command(
     "search",
@@ -33,16 +38,21 @@ bp = CommandsBlueprint()
     defer_register=False,
     guild_id=675647130647658527,
 )
-async def search(query: str = Option(description="Search for the Anime here.", autocomplete=True), other_option: str = Option(autocomplete=False)) -> Response:
-    print(query, other_option)
+async def search() -> Response:
     return Response(
         content=(f"<:exitment:717784139641651211> All done! I'll send news to "),
+        components=[[test_button]],
+        component_context={"test": "ahh", "ttl": 30},
     )
 
 
-@search.autocomplete(for_="query")
-async def run_query(query: CommandChoice = None, other_option: CommandChoice = None):
-    return [CompletedOption(name=query.value, value=query.value)]
+@bp.button(label="test", style=ButtonStyle.PRIMARY)
+async def test_button(ctx: InvokeContext):
+    return Response(
+        content=(f"<:exitment:717784139641651211> All done! I'll send news to "),
+        components=[[test_button.disabled()]],
+        component_context={"ttl": 30},
+    )
 
 
 app.add_blueprint(bp)

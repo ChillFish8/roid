@@ -78,6 +78,13 @@ class DeferredComponent(DeferredAppItem):
 
         return func
 
+    def disabled(self) -> CommandContext:
+        """Returns a disabled version of this button."""
+
+        if self._initialised is None:
+            raise TypeError(f"component not initialised")
+        return self._initialised.disabled()
+
 
 class DeferredButton(DeferredComponent):
     """A deferred component which is already set to target the button method."""
@@ -292,7 +299,9 @@ class DeferredCommand(DeferredAppItem):
             return func
 
         def wrapper(func_):
-            self._call_pipeline.append(CallDeferredAttr("autocomplete", func_, for_=for_))
+            self._call_pipeline.append(
+                CallDeferredAttr("autocomplete", func_, for_=for_)
+            )
             return func_
 
         return wrapper

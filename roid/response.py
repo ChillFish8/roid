@@ -63,9 +63,10 @@ class DeferredResponsePayload(ResponseData):
     components: Optional[
         List[
             Union[
-                List[Union[Component, DeferredComponent]],
+                List[Union[Component, DeferredComponent, ComponentContext]],
                 DeferredComponent,
                 Component,
+                ComponentContext,
             ],
         ]
     ]
@@ -93,9 +94,10 @@ class Response:
         components: Optional[
             List[
                 Union[
-                    List[Union[Component, DeferredComponent]],
+                    List[Union[Component, DeferredComponent, ComponentContext]],
                     DeferredComponent,
                     Component,
+                    ComponentContext,
                 ],
             ]
         ] = None,
@@ -242,14 +244,17 @@ class Response:
     ) -> ActionRow:
         state = app.state[COMMAND_STATE_TARGET]
 
-        if isinstance(block, (Component, DeferredComponent)):
+        if isinstance(block, (Component, DeferredComponent, ComponentContext)):
             if isinstance(block, DeferredComponent):
                 if block._initialised is None:  # noqa
                     block = block(app=app)
                 else:
                     block = block._initialised  # noqa
 
-            data = block.data.copy()
+            if isinstance(block, ComponentContext):
+                data = block.copy()
+            else:
+                data = block.data.copy()
 
             # If its got a url we wont get invoked on a click
             # so we can ignore setting a reference id.
@@ -270,7 +275,9 @@ class Response:
             return ActionRow(components=[data])
 
         for component in block:
-            if not isinstance(component, (Component, DeferredComponent)):
+            if not isinstance(
+                component, (Component, DeferredComponent, ComponentContext)
+            ):
                 raise TypeError(
                     f"invalid component given, expected type "
                     f"`Component` or `DeferredComponent` got {type(component)!r}"
@@ -282,7 +289,10 @@ class Response:
                 else:
                     component = component._initialised  # noqa
 
-            data = component.data.copy()
+            if isinstance(component, ComponentContext):
+                data = component.copy()
+            else:
+                data = component.data.copy()
 
             if data.type == ComponentType.SELECT_MENU and len(component_block) > 0:
                 raise ValueError(

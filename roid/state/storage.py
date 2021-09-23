@@ -82,7 +82,7 @@ class RedisBackend(StorageBackend):
         await self._redis.set(key, value, ex=ttl)
 
     async def get(self, key: str) -> Optional[bytes]:  # noqa
-        await self._redis.get(key)
+        return await self._redis.get(key)
 
     async def remove(self, key: str):
         await self._redis.delete(key)
