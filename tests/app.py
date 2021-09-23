@@ -53,16 +53,14 @@ async def test_button(ctx: InvokeContext):
         content=f"<:exitment:717784139641651211> All done! I'll send news to ",
         components=[
             [test_button.disabled()],
-            test_select.with_options(
-                SelectOption(label="ahhh", value="ahhh")
-            )
+            test_select.with_options(SelectOption(label="ahhh", value="ahhh")),
         ],
         component_context={"ttl": 30},
     )
 
 
 @bp.select(placeholder="Pick a value, any value!")
-async def test_select(options: SelectOption):
+async def test_select(options: str):
     return Response(content="yay!")
 
 

@@ -680,11 +680,11 @@ class SlashCommands(FastAPI):
 
                 if origin is list:
                     inner, *_ = typing.get_args(origin)
-                    if inner is SelectOption:
+                    if inner is str:
                         options = []
                         break
 
-                if hint is SelectOption:
+                if hint is str:
                     options = []
                     break
 
@@ -748,7 +748,11 @@ def _get_select_options(val: typing.Any) -> List[SelectOption]:
         return option_choices
 
     if not issubclass(val, Enum):
-        raise TypeError("invalid type given expected a subclass of Enum or Literal.")
+        raise TypeError(
+            "invalid type given expected a subclass of Enum or Literal.\n"
+            "Note: you can hint as type `str` to mark the select as general component. "
+            "This means you can add options at runtime via component.with_options()."
+        )
 
     set_type = None
     for v in val:
