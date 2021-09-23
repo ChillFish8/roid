@@ -149,7 +149,7 @@ class DeferredSelect(DeferredComponent):
     def __call__(self, app: SlashCommands) -> Component:
         return super().__call__(app)
 
-    def with_options(self, items: List[SelectOption]) -> ComponentContext:
+    def with_options(self, options: List[SelectOption]) -> ComponentContext:
         """
         Takes a general select component and populates it with the given options.
 
@@ -158,7 +158,7 @@ class DeferredSelect(DeferredComponent):
         WARNING: If this is not done the general select will be rejected.
 
         Args:
-            items:
+            options:
                 A list of select options for the user to choose from.
 
         Returns:
@@ -169,7 +169,7 @@ class DeferredSelect(DeferredComponent):
             raise TypeError(f"component not initialised")
 
         ctx = self._initialised.data.copy()
-        return ctx.with_options(items)
+        return ctx.with_options(options)
 
 
 class DeferredCommand(DeferredAppItem):

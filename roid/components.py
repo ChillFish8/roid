@@ -81,8 +81,8 @@ class ComponentContext(BaseModel):
         self.disabled = True
         return self
 
-    def with_options(self, *options: SelectOption):
-        self.options = list(options)
+    def with_options(self, options: List[SelectOption]):
+        self.options = options
         return self
 
 
@@ -235,7 +235,7 @@ class Component(OptionalAsyncCallable):
         ctx.disabled = True
         return ctx
 
-    def with_options(self, items: List[SelectOption]) -> ComponentContext:
+    def with_options(self, options: List[SelectOption]) -> ComponentContext:
         """
         Takes a general select component and populates it with the given options.
 
@@ -244,7 +244,7 @@ class Component(OptionalAsyncCallable):
         WARNING: If this is not done the general select will be rejected.
 
         Args:
-            items:
+            options:
                 A list of select options for the user to choose from.
 
         Returns:
