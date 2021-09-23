@@ -684,7 +684,7 @@ class SlashCommands(FastAPI):
                         options = []
                         break
 
-                if origin is SelectOption:
+                if hint is SelectOption:
                     options = []
                     break
 

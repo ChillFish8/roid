@@ -81,8 +81,8 @@ class ComponentContext(BaseModel):
         self.disabled = True
         return self
 
-    def with_options(self, items: List[SelectOption]):
-        self.options = items
+    def with_options(self, *options: SelectOption):
+        self.options = list(options)
         return self
 
 
