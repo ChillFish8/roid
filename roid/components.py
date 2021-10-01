@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 import asyncio
 import functools
-from enum import IntEnum, auto, Enum
+from enum import IntEnum, auto
 from typing import (
     Optional,
     Union,
@@ -13,7 +13,6 @@ from typing import (
     Coroutine,
     TYPE_CHECKING,
     Tuple,
-    Type,
 )
 from pydantic import BaseModel, conint, AnyHttpUrl, constr, validate_arguments
 
@@ -35,6 +34,10 @@ if TYPE_CHECKING:
         Union[ResponsePayload, Coroutine[Any, Any, ResponsePayload]],
     ]
 
+DiscordHttpUrl = constr(
+    strip_whitespace=True,
+    regex="(?:https|http|discord)://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*(),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+",
+)
 LimitedStr = constr(strip_whitespace=True, max_length=100, min_length=1)
 EMOJI_REGEX = r"<(a)?:([a-zA-Z0-9]+):([0-9]{17,26})>"
 
@@ -71,7 +74,7 @@ class ComponentContext(BaseModel):
     style: Optional[ButtonStyle]
     label: Optional[str]
     emoji: Optional[PartialEmoji]
-    url: Optional[AnyHttpUrl]
+    url: Optional[DiscordHttpUrl]
     options: List[SelectOption] = []
     placeholder: Optional[str]
     min_values: Optional[conint(ge=0, le=25)]
@@ -160,7 +163,7 @@ class Component(OptionalAsyncCallable):
         style: Optional[ButtonStyle] = None,
         label: Optional[str] = None,
         emoji: Optional[PartialEmoji] = None,
-        url: Optional[AnyHttpUrl] = None,
+        url: Optional[DiscordHttpUrl] = None,
         options: Optional[List[SelectOption]] = None,
         disabled: bool = False,
         placeholder: Optional[str] = None,
@@ -251,7 +254,7 @@ class Component(OptionalAsyncCallable):
             The populated context of the component.
         """
         ctx = self.data.copy()
-        return ctx.with_options(items)
+        return ctx.with_options(options)
 
     @property
     def data(self) -> ComponentContext:
