@@ -3,7 +3,7 @@ from enum import IntEnum, auto
 
 from pydantic import BaseModel
 
-from roid.objects import User, Role, Channel, Member, PartialMessage
+from roid.objects import User, Role, Channel, Member, PartialMessage, ChannelType
 from roid.components import ComponentType
 
 
@@ -39,6 +39,7 @@ class CommandOption(BaseModel):
     autocomplete: Optional[bool] = None
     choices: List[CommandChoice] = None
     options: List["CommandOption"] = None
+    channel_types: List[ChannelType] = None
 
 
 CommandOption.update_forward_refs()

@@ -14,7 +14,7 @@ from roid import (
 )
 from roid.components import SelectOption
 from roid.interactions import CommandChoice
-from roid.objects import CompletedOption
+from roid.objects import CompletedOption, ChannelType, Channel
 from roid.state import RedisBackend
 
 logging.basicConfig(level=logging.INFO)
@@ -39,7 +39,9 @@ bp = CommandsBlueprint()
     defer_register=False,
     guild_id=675647130647658527,
 )
-async def search() -> Response:
+async def search(
+    foo: Channel = Option(channel_types=[ChannelType.GUILD_TEXT]),
+) -> Response:
     return Response(
         content=f"<:exitment:717784139641651211> All done! I'll send news to ",
         components=[[test_button]],

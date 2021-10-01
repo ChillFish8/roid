@@ -40,6 +40,7 @@ from roid.objects import (
     User,
     ResponseType,
     CompletedOption,
+    ChannelType,
 )
 from roid.extractors import extract_options
 from roid.checks import CommandCheck
@@ -75,12 +76,14 @@ class SetValue:
         name: Optional[str],
         description: Optional[str],
         autocomplete: Optional[bool],
+        channel_types: Optional[List[ChannelType]],
     ):
         self.default = default
         self.required = self.default is Ellipsis
         self.name = name
         self.description = description
         self.autocomplete = autocomplete
+        self.channel_types = channel_types
 
 
 def Option(
@@ -89,8 +92,9 @@ def Option(
     name: str = None,
     description: str = None,
     autocomplete: Optional[bool] = None,
+    channel_types: List[ChannelType] = None,
 ) -> Any:  # noqa
-    return SetValue(default, name, description, autocomplete)
+    return SetValue(default, name, description, autocomplete, channel_types)
 
 
 VALID_CHOICE_TYPES = (
@@ -305,11 +309,13 @@ class Command(OptionalAsyncCallable):
             else:
                 default = Ellipsis
 
+            channel_types = None
             required = default is Ellipsis
             if isinstance(default, SetValue):
                 name = default.name or name
                 description = default.description or description
                 required = default.default is Ellipsis
+                channel_types = default.channel_types
             elif len(choice_blocks) > 0:
                 description = "Select an option from the list."
 
@@ -318,6 +324,7 @@ class Command(OptionalAsyncCallable):
                 description=description,
                 type=option_type,
                 required=required,
+                channel_types=channel_types,
             )
 
             if (len(choice_blocks) > 0) and (option_type not in VALID_CHOICE_TYPES):
