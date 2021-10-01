@@ -168,8 +168,7 @@ class DeferredSelect(DeferredComponent):
         if self._initialised is None:
             raise TypeError(f"component not initialised")
 
-        ctx = self._initialised.data.copy()
-        return ctx.with_options(options)
+        return self._initialised.with_options(options)
 
 
 class DeferredCommand(DeferredAppItem):

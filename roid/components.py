@@ -58,6 +58,9 @@ class SelectOption(BaseModel):
     def __eq__(self, other: SelectOption):
         return self.label == other.label
 
+    def __hash__(self):
+        return hash(self.label)
+
 
 class ButtonStyle(IntEnum):
     PRIMARY = auto()
@@ -254,7 +257,7 @@ class Component(OptionalAsyncCallable):
             The populated context of the component.
         """
         ctx = self.data.copy()
-        return ctx.with_options(options)
+        return ctx.with_options(list(set(options)))
 
     @property
     def data(self) -> ComponentContext:
